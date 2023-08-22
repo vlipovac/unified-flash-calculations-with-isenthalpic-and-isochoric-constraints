@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.9.5
 
 # Keeps Python from generating .pyc files in the container
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -17,11 +17,9 @@ RUN apt-get install -y wget vim bzip2 git libglu1-mesa libxrender1 libxcursor1 l
 RUN pip install --upgrade pip
 
 # Install dependencies
-RUN pip install pypardiso==0.4.2
 RUN pip install -r ./requirements.txt
 RUN pip install -r ./requirements-dev.txt
-RUN pip install chemicals
-RUN pip install thermo
+RUN pip install mkl==2023.0.0
 RUN pip install psutil
 
 # Install PorePy

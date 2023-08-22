@@ -11,3 +11,6 @@ shapely
 six
 sympy
 typing_extensions
+pypardiso == 0.4.2
+chemicals == 1.1.2
+thermo == 0.2.23
