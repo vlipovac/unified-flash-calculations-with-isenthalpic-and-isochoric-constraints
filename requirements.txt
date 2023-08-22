@@ -3,10 +3,10 @@ gmsh
 matplotlib
 meshio >= 5.0
 networkx
-numba >= 0.56.3
-numpy
+numba == 0.56.
+numpy == 1.22.4
 requests
-scipy
+scipy == 1.9.1
 shapely
 six
 sympy

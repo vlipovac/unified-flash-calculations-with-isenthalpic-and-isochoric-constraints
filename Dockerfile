@@ -17,7 +17,7 @@ RUN apt-get install -y wget vim bzip2 git libglu1-mesa libxrender1 libxcursor1 l
 RUN pip install --upgrade pip
 
 # Install dependencies
-RUN pip install pypardiso
+RUN pip install pypardiso==0.4.2
 RUN pip install -r ./requirements.txt
 RUN pip install -r ./requirements-dev.txt
 RUN pip install chemicals
