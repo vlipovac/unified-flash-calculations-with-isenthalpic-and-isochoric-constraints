@@ -262,6 +262,9 @@ def rachford_rice_vle_inversion(
 
     The solution obtained is the vapor fraction.
 
+    Important:
+        This inversion holds only for a binary mixture.
+
     .. math::
 
         f_j(y) = \\sum\\limits_{i=1}^{n_c}
@@ -287,7 +290,7 @@ def rachford_rice_vle_inversion(
     # number of components
     nc = len(z)
     # numerator
-    n = (nc - 1) * safe_sum([(1 - K[i]) * z[i] for i in range(nc)])
+    n = safe_sum([(1 - K[i]) * z[i] for i in range(nc)])
     # denominator
     d = safe_sum(
         [

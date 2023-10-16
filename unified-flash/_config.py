@@ -52,11 +52,14 @@ GREY_COL = (0.5, 0.5, 0.5, 1)
 # Calculation modus for PorePy flash
 # 1 - point-wise (robust, but possibly very slow),
 # 3 - parallelized (use with care, if system compatible)
-CALCULATION_MODE: int = 3
+CALCULATION_MODE: int = 1
 
 # fluid mixture configuration
 SPECIES: list[str] = ["H2O", "CO2"]
 FEED: list[float] = [0.99, 0.01]
+
+SPECIES_geo: list[str] = ["H2O", "CO2", "H2S", "N2"]
+FEED_geo: list[float] = [0.8, 0.05, 0.1, 0.05]
 
 # pressure and temperature limits for p-T calculations
 P_LIMITS: list[float] = [1e6, 50e6]  # [Pa]
@@ -78,6 +81,11 @@ HV_ISOTHERM: float = 575.0
 HV_ISOTHERM_P_LIMITS: list[float] = [5e6, 15e6]
 # pressure and temperature resolution for isobar and isotherm for h-v flash
 RESOLUTION_hv: int = 10
+
+# Pressure and enthalpy limits for multi-component, geothermal fluid example
+GEO_P_LIMITS: list[float] = [1e6, 23e6]  # [Pa]
+GEO_H_LIMITS: list[float] = [-15e3, 15e3]  # [kJ]
+RESOLUTION_geo: int = 6
 
 # Limits for A and B when plotting te roots
 A_LIMITS: list[float] = [0, 2 * pp.composite.peng_robinson.PengRobinsonEoS.A_CRIT]
@@ -108,6 +116,7 @@ HV_ISOBAR_DATA_PATH: str = (
     "data/flash_hv_isobar.csv"  # storing p-T results on isobar for h-v flash
 )
 HV_FLASH_DATA_PATH: str = "data/flash_hv.csv"  # storing h-v results from porepy
+GEO_DATA_PATH: str = "data/flash_geo.csv"  # storing p-h results for geothermal model
 FIG_PATH: str = "figs/"  # path to folder containing plots
 
 NUM_COMP: int = len(SPECIES)  # number of components
@@ -135,6 +144,13 @@ composition_HEADER: dict[str, dict[str, str]] = dict(
 compressibility_HEADER: dict[str, str] = dict([(f"{j}", f"Z_{j}") for j in PHASES])
 fugacity_HEADER: dict[str, dict[str, str]] = dict(
     [(i, dict([(f"{j}", f"phi_{i}_{j}") for j in PHASES])) for i in SPECIES]
+)
+
+composition_HEADER_geo: dict[str, dict[str, str]] = dict(
+    [(i, dict([(f"{j}", f"x_{i}_{j}") for j in PHASES])) for i in SPECIES_geo]
+)
+fugacity_HEADER_geo: dict[str, dict[str, str]] = dict(
+    [(i, dict([(f"{j}", f"phi_{i}_{j}") for j in PHASES])) for i in SPECIES_geo]
 )
 
 # Number of physical CPU cores.
@@ -563,6 +579,30 @@ def _array_headers() -> list[str]:
     return headers
 
 
+def _array_headers_geo() -> list[str]:
+    """Analogon for geothermal fluid mixture."""
+    headers = [
+        success_HEADER,
+        num_iter_HEADER,
+        conditioning_HEADER,
+        p_HEADER,
+        T_HEADER,
+        h_HEADER,
+        v_HEADER,
+        gas_satur_HEADER,
+        gas_frac_HEADER,
+        compressibility_HEADER[PHASES[0]],
+        compressibility_HEADER[PHASES[1]],
+    ]
+    for i in SPECIES_geo:
+        for j in PHASES[:2]:
+            headers += [composition_HEADER_geo[i][j]]
+    for i in SPECIES_geo:
+        for j in PHASES[:2]:
+            headers += [fugacity_HEADER_geo[i][j]]
+    return headers
+
+
 def _create_shared_arrays(size: int) -> list[tuple[Array, Any]]:
     """Creates shared memory arrays for the parallelized flash and returns a list of
     tuples with arrays and their data types as entries.
@@ -623,6 +663,73 @@ def _create_shared_arrays(size: int) -> list[tuple[Array, Any]]:
             shared_arrays.append((x, FLOAT_PRECISION))
     # arrays containing the fugacities
     for _ in SPECIES:
+        for _ in PHASES[:2]:
+            phi = _double_array()
+            shared_arrays.append((phi, FLOAT_PRECISION))
+
+    return shared_arrays
+
+
+def _create_shared_arrays_geo(size: int) -> list[tuple[Array, Any]]:
+    """Creates shared memory arrays for the parallelized flash and returns a list of
+    tuples with arrays and their data types as entries.
+
+    Important:
+        The order here in the list determines for which quantities they are used.
+        The same order is assumed in the parallelized flash.
+        It must not be messed with.
+
+        The order corresponds to the order returned by ``get_result_headers``.
+
+    ``size`` determines the size of the allocated arrays. It must be equal the number
+    of flashes performed in parallel.
+
+    """
+    shared_arrays: list[tuple[Array, Any]] = list()
+
+    INT_PRECISION = c_uint8
+    FLOAT_PRECISION = c_double
+
+    def _double_array():
+        return RawArray(typecode_or_type=FLOAT_PRECISION, size_or_initializer=size)
+
+    def _uint_array():
+        return RawArray(typecode_or_type=INT_PRECISION, size_or_initializer=size)
+
+    # array to store the success flag
+    success = _uint_array()
+    shared_arrays.append((success, INT_PRECISION))
+    # integer array to store the number of iterations necessary
+    num_iter = _uint_array()
+    shared_arrays.append((num_iter, INT_PRECISION))
+    # array storing the condition number of the array at the beginning (initial guess)
+    cond_start = _double_array()
+    shared_arrays.append((cond_start, FLOAT_PRECISION))
+    # arrays containing pressure, temperature, enthalpies and volume
+    p = _double_array()
+    shared_arrays.append((p, FLOAT_PRECISION))
+    T = _double_array()
+    shared_arrays.append((T, FLOAT_PRECISION))
+    h = _double_array()
+    shared_arrays.append((h, FLOAT_PRECISION))
+    v = _double_array()
+    shared_arrays.append((v, FLOAT_PRECISION))
+    # array containing the vapor fraction
+    s = _double_array()
+    shared_arrays.append((s, FLOAT_PRECISION))
+    y = _double_array()
+    shared_arrays.append((y, FLOAT_PRECISION))
+    # arrays containing the phase compressibility factors
+    for _ in range(2):
+        Z = _double_array()
+        shared_arrays.append((Z, FLOAT_PRECISION))
+    # arrays containing the phase composition
+    for _ in SPECIES_geo:
+        for _ in PHASES[:2]:
+            x = _double_array()
+            shared_arrays.append((x, FLOAT_PRECISION))
+    # arrays containing the fugacities
+    for _ in SPECIES_geo:
         for _ in PHASES[:2]:
             phi = _double_array()
             shared_arrays.append((phi, FLOAT_PRECISION))
@@ -695,6 +802,46 @@ def create_mixture(
     if flash_type == "h-v":
         flash.armijo_parameters["rho"] = 0.9
         flash.armijo_parameters["j_max"] = 150
+
+    return mix, flash
+
+
+def create_mixture_geo(
+    num_vals: int,
+) -> tuple[pp.composite.NonReactiveMixture, pp.composite.FlashNR]:
+    """Analogon to ''create_mixture'' for geothermal fluid misture."""
+
+    species = pp.composite.load_species(SPECIES_geo)
+
+    comps = [
+        pp.composite.peng_robinson.H2O.from_species(species[0]),
+        pp.composite.peng_robinson.CO2.from_species(species[1]),
+        pp.composite.peng_robinson.H2S.from_species(species[2]),
+        pp.composite.peng_robinson.N2.from_species(species[3]),
+    ]
+
+    phases = [
+        pp.composite.Phase(
+            pp.composite.peng_robinson.PengRobinsonEoS(gaslike=False), name="L"
+        ),
+        pp.composite.Phase(
+            pp.composite.peng_robinson.PengRobinsonEoS(gaslike=True), name="G"
+        ),
+    ]
+
+    mix = pp.composite.NonReactiveMixture(comps, phases)
+
+    mix.set_up(num_vals=num_vals)
+
+    # instantiating Flasher, without auxiliary variables V and W
+    flash = pp.composite.FlashNR(mix)
+    flash.use_armijo = True
+    flash.armijo_parameters["rho"] = 0.99
+    flash.armijo_parameters["j_max"] = 70
+    flash.armijo_parameters["return_max"] = True
+    flash.newton_update_chop = 1.0
+    flash.tolerance = 1e-5
+    flash.max_iter = 150
 
     return mix, flash
 
@@ -879,6 +1026,162 @@ def _parallel_porepy_flash(args):
     progress_queue_loc.put(i, block=False)
 
 
+def _parallel_porepy_flash_geo(args):
+    """Analogon to ''_parallel_porepy_flash`` for the geothermal fluid mixture
+
+    """
+
+    i, state_1, state_2, flash_type, quickshot = args
+    msg = (i, state_1, state_2)
+
+    # accessing shared memory
+    global arrays_loc, progress_queue_loc
+    (
+        success_arr,
+        num_iter_arr,
+        cond_arr,
+        p_arr,
+        T_arr,
+        h_arr,
+        v_arr,
+        s_arr,
+        y_arr,
+        Z_G_arr,
+        Z_L_arr,
+        x_h2o_G_arr,
+        x_h2o_L_arr,
+        x_co2_G_arr,
+        x_co2_L_arr,
+        x_h2s_G_arr,
+        x_h2s_L_arr,
+        x_n2_G_arr,
+        x_n2_L_arr,
+        phi_h2o_G_arr,
+        phi_h2o_L_arr,
+        phi_co2_G_arr,
+        phi_co2_L_arr,
+        phi_h2s_G_arr,
+        phi_h2s_L_arr,
+        phi_n2_G_arr,
+        phi_n2_L_arr,
+    ) = arrays_loc
+
+    mix, flash = create_mixture_geo(1)
+    feed = [np.ones(1) * z for z in FEED_geo]
+
+    # Default entries are FAILURE
+    success_arr[i] = 2
+    num_iter_arr[i] = 0
+    cond_arr[i] = NAN_ENTRY
+    p_arr[i] = NAN_ENTRY
+    T_arr[i] = NAN_ENTRY
+    h_arr[i] = NAN_ENTRY
+    v_arr[i] = NAN_ENTRY
+    s_arr[i] = NAN_ENTRY
+    y_arr[i] = NAN_ENTRY
+    Z_L_arr[i] = NAN_ENTRY
+    Z_G_arr[i] = NAN_ENTRY
+    x_h2o_G_arr[i] = NAN_ENTRY
+    x_h2o_L_arr[i] = NAN_ENTRY
+    x_co2_G_arr[i] = NAN_ENTRY
+    x_co2_L_arr[i] = NAN_ENTRY
+    x_h2s_G_arr[i] = NAN_ENTRY
+    x_h2s_L_arr[i] = NAN_ENTRY
+    x_n2_G_arr[i] = NAN_ENTRY
+    x_n2_L_arr[i] = NAN_ENTRY
+    phi_h2o_G_arr[i] = NAN_ENTRY
+    phi_h2o_L_arr[i] = NAN_ENTRY
+    phi_co2_G_arr[i] = NAN_ENTRY
+    phi_co2_L_arr[i] = NAN_ENTRY
+    phi_h2s_G_arr[i] = NAN_ENTRY
+    phi_h2s_L_arr[i] = NAN_ENTRY
+    phi_n2_G_arr[i] = NAN_ENTRY
+    phi_n2_L_arr[i] = NAN_ENTRY
+
+    if flash_type == "p-T":
+        state_input = {"p": np.array([state_1]), "T": np.array([state_2])}
+    elif flash_type == "p-h":
+        state_input = {"p": np.array([state_1]), "h": np.array([state_2])}
+    elif flash_type == "h-v":
+        state_input = {"h": np.array([state_1]), "v": np.array([state_2])}
+
+    try:
+        success_, state = flash.flash(
+            state=state_input,
+            feed=feed,
+            eos_kwargs={"apply_smoother": True},
+            quickshot=quickshot,
+            return_system=True,
+        )
+    except Exception as err:  # if Flasher fails, flag as failed
+        logger.warn(f"\nParallel {flash_type} flash crashed at {msg}\n{str(err)}\n")
+    else:
+        success_arr[i] = success_
+        if success_ == 2:
+            logger.warn(f"\nParallel {flash_type} diverged at {msg}\n")
+        else:
+            if success_ == 1:
+                logger.warn(
+                    f"\nParallel {flash_type} stopped after max iter at {msg}\n"
+                )
+            try:
+                cn = np.linalg.cond(state(with_derivatives=True).jac.todense())
+            except:
+                logger.warn(
+                    f"\nParallel {flash_type} failed to compute condition number at "
+                    + f"{msg} (exit code = {success_})\n"
+                )
+                cn = NAN_ENTRY
+
+            cond_arr[i] = cn
+            if quickshot:
+                num_iter_arr[i] = 0
+            else:
+                num_iter_arr[i] = flash.history[-1]["iterations"]
+
+            state = state.export_state()
+
+            p_arr[i] = state.p[0]
+            T_arr[i] = state.T[0]
+            h_arr[i] = state.h[0]
+            v_arr[i] = state.v[0]
+
+            s_arr[i] = state.s[1][0]
+            y_arr[i] = state.y[1][0]
+            x_h2o_L_arr[i] = state.X[0][0][0]
+            x_h2o_G_arr[i] = state.X[1][0][0]
+            x_co2_L_arr[i] = state.X[0][1][0]
+            x_co2_G_arr[i] = state.X[1][1][0]
+            x_h2s_L_arr[i] = state.X[0][2][0]
+            x_h2s_G_arr[i] = state.X[1][2][0]
+            x_n2_L_arr[i] = state.X[0][3][0]
+            x_n2_G_arr[i] = state.X[1][3][0]
+            props = mix.compute_properties(state.p, state.T, state.X, store=False)
+            Z_L_arr[i] = props[0].Z[0]
+            Z_G_arr[i] = props[1].Z[0]
+            phi_h2o_L_arr[i] = props[0].phis[0][0]
+            phi_co2_L_arr[i] = props[0].phis[1][0]
+            phi_h2s_L_arr[i] = props[0].phis[2][0]
+            phi_n2_L_arr[i] = props[0].phis[3][0]
+            phi_h2o_G_arr[i] = props[1].phis[0][0]
+            phi_co2_G_arr[i] = props[1].phis[1][0]
+            phi_h2s_G_arr[i] = props[1].phis[2][0]
+            phi_n2_G_arr[i] = props[1].phis[3][0]
+
+    # to ensure proper mapping between state args (just in case something goes wrong)
+    if flash_type == "p-T":
+        p_arr[i] = state_1
+        T_arr[i] = state_2
+    elif flash_type == "p-h":
+        p_arr[i] = state_1
+        h_arr[i] = state_2
+    elif flash_type == "h-v":
+        h_arr[i] = state_1
+        v_arr[i] = state_2
+
+    progress_queue_loc.put(i, block=False)
+
+
 def calculate_porepy_data(
     state_1: list[float], state_2: list[float], flash_type: str, quickshot: bool = False
 ) -> dict:
@@ -1042,6 +1345,85 @@ def calculate_porepy_data(
         )
     else:
         raise ValueError(f"Unknown flash calculation mode {CALCULATION_MODE}.")
+
+    return results
+
+
+def calculate_geo_example():
+    p_ = np.linspace(
+        GEO_P_LIMITS[0],
+        GEO_P_LIMITS[1],
+        RESOLUTION_geo,
+        endpoint=True,
+        dtype=float,
+    )
+    h_ = np.linspace(
+        GEO_H_LIMITS[0],
+        GEO_H_LIMITS[1],
+        RESOLUTION_geo,
+        endpoint=True,
+        dtype=float,
+    )
+
+    flash_type = 'p-h'
+
+    h, p = np.meshgrid(h_, p_)
+
+    nf = h.shape[0] * h.shape[1]
+
+    args = [
+        (i, x, y, 'p-h', False)
+        for i, x, y in zip(np.arange(nf), p.flat, h.flat)
+    ]
+
+    shared_arrays = _create_shared_arrays_geo(nf)
+    logger.info(f"Parallel {flash_type} flash: starting ..")
+    start_time = time.time()
+    prog_q = Queue(maxsize=nf)
+    with Pool(
+        processes=NUM_PHYS_CPU_CORS + 1,
+        initargs=(shared_arrays, prog_q),
+        initializer=_access_shared_objects,
+    ) as pool:
+
+        prog_process = Process(
+            target=_progress_counter, args=(prog_q, nf, None), daemon=True
+        )
+        prog_process.start()
+
+        chunksize = np.array(
+            [NUM_PHYS_CPU_CORS, RESOLUTION_geo]
+        ).min()
+        result = pool.map_async(_parallel_porepy_flash_geo, args, chunksize=chunksize)
+
+        # Wait for some time and see if processes terminate as they should
+        # we terminate if the processes for some case could not finish
+        result.wait(60 * 60 * 5)
+        if result.ready():
+            prog_process.join(5)
+            if prog_process.exitcode != 0:
+                prog_process.terminate()
+            pool.close()
+        else:
+            prog_process.terminate()
+            logger.warn(f"\nParallel {flash_type} flash: terminated\n")
+            pool.close()
+            pool.terminate()
+        pool.join()
+
+    end_time = time.time()
+    logger.info(
+        f"\nParallel {flash_type} flash: finished after {end_time - start_time} seconds.\n"
+    )
+
+    result_vecs = [
+        list(np.frombuffer(vec, dtype=dtype))
+        # list(np.frombuffer(vec.get_obj(), dtype=dtype))  # For Array (synchronized)
+        for vec, dtype in shared_arrays
+    ]
+    results = dict(
+        [(header, vec) for header, vec in zip(_array_headers_geo(), result_vecs)]
+    )
 
     return results
 

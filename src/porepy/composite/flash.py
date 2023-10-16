@@ -9,6 +9,7 @@ from typing import Any, Callable, Literal, Optional, overload
 import numpy as np
 import pypardiso
 import scipy.sparse as sps
+import scipy.optimize as spo
 
 import porepy as pp
 from porepy.numerics.ad.operator_functions import NumericType
@@ -19,6 +20,7 @@ from ._core import (
     rachford_rice_feasible_region,
     rachford_rice_potential,
     rachford_rice_vle_inversion,
+    rachford_rice_equation,
 )
 from .composite_utils import safe_sum
 from .heuristics import K_val_Wilson
@@ -1454,7 +1456,33 @@ class FlashNR:
             # Computing phase fraction estimates,
             # depending on number of independent phases
             if nph == 2:
-                y = rachford_rice_vle_inversion(state.z, K[0])
+                # binrary case: RR is directly invertible
+                if ncp == 2:
+                    y = rachford_rice_vle_inversion(state.z, K[0])
+                # multi-component: RR solution approximated
+                else:
+                    # Callable representing the rachford rice equation
+                    assert num_vals == 1, "Vectorized, multi-component fraction guess not supported."
+                    def _rr(y):
+                        return rachford_rice_equation(0, state.z, [y], K)[0]
+
+                    # Use inner poles (negative flash) to bound the domain within which
+                    # the root is searched for
+                    K_ = np.array(K[0])
+                    K_min = np.min(K_, axis=0)
+                    K_max = np.max(K_, axis=0)
+                    beta_min_ = 1 / (1 - K_max)
+                    beta_max_ = 1 / (1 - K_min)
+                    # for some unknown reasons, above formula does not always hold
+                    beta_min = np.where(beta_min_ < beta_max_, beta_min_, beta_max_)
+                    beta_max = np.where(beta_min_ < beta_max_, beta_max_, beta_min_)
+                    # avoid evaluation at poles with some threshold
+                    tol_ = 1e-4
+                    beta_min += tol_
+                    beta_max -= tol_ 
+
+                    y = np.array([spo.brentq(_rr, beta_min[0], beta_max[0])])
+                    
                 negative = y < 0.0
                 exceeds = y > 1.0
                 invalid = negative | exceeds

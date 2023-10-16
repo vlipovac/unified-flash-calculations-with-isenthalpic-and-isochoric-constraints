@@ -13,15 +13,17 @@ import numpy as np
 
 import porepy as pp
 
-chems = ["H2O", "CO2"]
+chems = ["H2O", "CO2", "H2S", "N2"]
 
 vec = np.ones(1)
 # feed fractions
-z = [vec * 0.99,  vec * 0.01]
+z = [vec * 0.8,  vec * 0.05, vec * 0.1, vec * 0.05]
 # pressure
 p = vec * 13000000.0
 # temperature
-T = vec * 550.0
+T = vec * 350.0
+# enthalpy
+h = vec  * 2e3
 # verbosity for logs during flash
 verbosity = 2
 
@@ -32,6 +34,8 @@ species = pp.composite.load_species(chems)
 comps = [
     pp.composite.peng_robinson.H2O.from_species(species[0]),
     pp.composite.peng_robinson.CO2.from_species(species[1]),
+    pp.composite.peng_robinson.H2S.from_species(species[2]),
+    pp.composite.peng_robinson.N2.from_species(species[3]),
 ]
 
 phases = [
@@ -66,7 +70,8 @@ flash.max_iter = 150
 ### p-T flash
 ### Other flash types are performed analogously.
 success, results_pT = flash.flash(
-    state={"p": p, "T": T},
+    # state={"p": p, "T": T},
+    state={"p": p, "h": h},
     eos_kwargs={"apply_smoother": True},
     feed=z,
     verbosity=verbosity,
