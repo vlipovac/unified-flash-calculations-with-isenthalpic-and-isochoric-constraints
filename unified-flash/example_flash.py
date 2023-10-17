@@ -19,11 +19,11 @@ vec = np.ones(1)
 # feed fractions
 z = [vec * 0.8,  vec * 0.05, vec * 0.1, vec * 0.05]
 # pressure
-p = vec * 13000000.0
+p = vec * 20368421.05263158
 # temperature
 T = vec * 350.0
 # enthalpy
-h = vec  * 2e3
+h = vec  * 11368.421052631578
 # verbosity for logs during flash
 verbosity = 2
 
@@ -61,21 +61,22 @@ mix.set_up()
 flash = pp.composite.FlashNR(mix)
 flash.use_armijo = True
 flash.armijo_parameters["rho"] = 0.99
-flash.armijo_parameters["j_max"] = 150
+flash.armijo_parameters["j_max"] = 50
 flash.armijo_parameters["return_max"] = True
 flash.newton_update_chop = 1.0
-flash.tolerance = 1e-5
+flash.tolerance = 1e-7
 flash.max_iter = 150
 
 ### p-T flash
 ### Other flash types are performed analogously.
-success, results_pT = flash.flash(
+flash._T_guess = 733.4821859121463
+success, results = flash.flash(
     # state={"p": p, "T": T},
     state={"p": p, "h": h},
     eos_kwargs={"apply_smoother": True},
     feed=z,
     verbosity=verbosity,
 )
-print("Results p-T:\n" + "------------")
-print(str(results_pT))
+print("Results:\n" + "------------")
+print(str(results))
 print("------------")

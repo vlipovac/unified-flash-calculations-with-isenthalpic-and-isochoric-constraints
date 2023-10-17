@@ -406,7 +406,7 @@ class FlashSystemNR(ThermodynamicState):
 
         """
         positivity_penalty = list()
-        reg = list()
+        # reg = list()
 
         negativity_penalty = 0.0
 
@@ -415,8 +415,8 @@ class FlashSystemNR(ThermodynamicState):
             w = W[j]
             positivity_penalty.append(v * w)
             negativity_penalty += _neg(v) ** 2 + _neg(w) ** 2
-            reg.append(_pos(v - 1) ** 2)
-            reg.append(_pos(w - 1) ** 2)
+            # reg.append(_pos(v - 1) ** 2)
+            # reg.append(_pos(w - 1) ** 2)
 
         dot_part = (
             pp.ad.power(_pos(safe_sum(positivity_penalty)), 2)
@@ -425,7 +425,7 @@ class FlashSystemNR(ThermodynamicState):
         )
         # reg = safe_sum(reg) * 4
 
-        f = self._eta * nu + nu * nu + (negativity_penalty + dot_part) / 2  # + reg / 2
+        f = self._eta * nu + nu * nu + ( 10.1 * negativity_penalty + dot_part) / 2  # + reg / 2
         return f
 
     @property
@@ -783,6 +783,9 @@ class FlashNR:
 
     def __init__(self, mixture: NonReactiveMixture) -> None:
 
+
+        self._T_guess: Optional[float] = None
+        """For debugging the p-h initialization."""
         ### PUBLIC
 
         # currently only 2-phase flash is supported
@@ -1075,20 +1078,26 @@ class FlashNR:
             if guess_from_state is None:
                 thd_state.z = feed
 
-                # initial temperature guess using pseudo-critical temperature
-                thd_state = self._pseudo_crit_T(thd_state)
-                thd_state = self._guess_fractions(
-                    thd_state, num_vals, num_iter=2, guess_K_values=True
-                )
-                # Alternating guess for fractions and temperature
-                # successive-substitution-like
-                for _ in range(15):
-                    # iterate over the enthalpy constraint some times to update T
-                    thd_state, _ = self._guess_temperature(thd_state, num_vals, 3)
-                    # Update fractions using the updated T
+                if self._T_guess is not None:
+                    thd_state.T.val = np.ones(num_vals) * self._T_guess
                     thd_state = self._guess_fractions(
-                        thd_state, num_vals, num_iter=1, guess_K_values=False
+                        thd_state, num_vals, num_iter=3, guess_K_values=True
                     )
+                else:
+                    # initial temperature guess using pseudo-critical temperature
+                    thd_state = self._pseudo_crit_T(thd_state)
+                    thd_state = self._guess_fractions(
+                        thd_state, num_vals, num_iter=2, guess_K_values=True
+                    )
+                    # Alternating guess for fractions and temperature
+                    # successive-substitution-like
+                    for _ in range(15):
+                        # iterate over the enthalpy constraint some times to update T
+                        thd_state, _ = self._guess_temperature(thd_state, num_vals, 3)
+                        # Update fractions using the updated T
+                        thd_state = self._guess_fractions(
+                            thd_state, num_vals, num_iter=3, guess_K_values=False
+                        )
 
         elif flash_type == "h-v":
 
@@ -1481,7 +1490,19 @@ class FlashNR:
                     beta_min += tol_
                     beta_max -= tol_ 
 
-                    y = np.array([spo.brentq(_rr, beta_min[0], beta_max[0])])
+                    if beta_max <= 0.:
+                        # special treatment if all poles are in negative half-space
+                        # then the graph of _rr is monotonously decreasing in (0, infty)
+                        # if negative at y=1. + eps, than there is a root between 0 and 1
+                        # if positive, Brent's method does not work (no opposite signs)
+                        # then just make it invalid and let below correction do its work
+                        test = _rr(1. + tol_)
+                        if test < 0.:
+                            y = np.array([spo.brentq(_rr, beta_min[0], 1. + tol_)])
+                        else:
+                            y = 1.1
+                    else:
+                        y = np.array([spo.brentq(_rr, beta_min[0], beta_max[0])])
                     
                 negative = y < 0.0
                 exceeds = y > 1.0

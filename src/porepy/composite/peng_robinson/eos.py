@@ -1158,10 +1158,13 @@ class PengRobinsonEoS(AbstractEoS):
             B_ = B[one_root_region]
 
             # delta has only positive values in this case by logic
-            t = -q_ / 2 + pp.ad.sqrt(delta_)
+            t_1 = -q_ / 2 + pp.ad.sqrt(delta_)
+            t_2 = -q_ / 2 - pp.ad.sqrt(delta_)
+            t = t_1.copy()
+            t2_greater = pp.ad.abs(t_2) > pp.ad.abs(t_1)
+            t[t2_greater] = t_2[t2_greater]
 
-            # t_1 might be negative, in this case we must choose the real cubic root
-            # by extracting cbrt(-1), where -1 is the real cubic root.
+            # principal cubic root if t is negative
             im_cube = t < 0.0
             if np.any(im_cube):
                 t[im_cube] = t[im_cube] * (-1)
