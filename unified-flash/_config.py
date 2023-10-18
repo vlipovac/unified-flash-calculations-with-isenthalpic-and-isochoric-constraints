@@ -67,14 +67,14 @@ FEED_geo: list[float] = [0.8, 0.05, 0.1, 0.05]
 P_LIMITS: list[float] = [1e6, 50e6]  # [Pa]
 T_LIMITS: list[float] = [450.0, 700.0]  # [K]
 # resolution of p-T limits
-RESOLUTION_pT: int = 50
+RESOLUTION_pT: int = 80
 
 # temperature values for isotherms for p-h calculations
 # more refined around critical temperature of water, up to critical pressure of water
 ISOTHERMS: list[float] = [500.0, 550.0, 600, 645.0, 647.14, 650.0]
 P_LIMITS_ISOTHERMS: list[float] = [1e6, 23000000.0]
 # pressure resolution along isotherms
-RESOLUTION_ph: int = 20
+RESOLUTION_ph: int = 40
 
 # Isobar and isotherm for h-v calculations
 HV_ISOBAR: float = 15e6
@@ -82,7 +82,7 @@ HV_ISOBAR_T_LIMITS: list[float] = [575, 630]
 HV_ISOTHERM: float = 575.0
 HV_ISOTHERM_P_LIMITS: list[float] = [5e6, 15e6]
 # pressure and temperature resolution for isobar and isotherm for h-v flash
-RESOLUTION_hv: int = 10
+RESOLUTION_hv: int = 20
 
 # Pressure and enthalpy limits for multi-component, geothermal fluid example
 GEO_P_LIMITS: list[float] = [20e6, 27e6]  # [Pa]
@@ -90,7 +90,7 @@ GEO_P_LIMITS: list[float] = [20e6, 27e6]  # [Pa]
 GEO_H_LIMITS: list[float] = [-15e3, 8e3]  # [kJ]
 GEO_T_LIMITS: list[float] = [500, 820]
 EXAMPLE_2_flash_type: str = 'p-h'  # p-T or p-h
-RESOLUTION_geo: int = 40
+RESOLUTION_geo: int = 50
 
 # Limits for A and B when plotting te roots
 A_LIMITS: list[float] = [0, 2 * pp.composite.peng_robinson.PengRobinsonEoS.A_CRIT]
@@ -907,15 +907,17 @@ def create_mixture(
     flash = pp.composite.FlashNR(mix)
     flash.use_armijo = True
     flash.armijo_parameters["rho"] = 0.99
-    flash.armijo_parameters["j_max"] = 70
+    flash.armijo_parameters["j_max"] = 50
     flash.armijo_parameters["return_max"] = True
     flash.newton_update_chop = 1.0
-    flash.tolerance = 1e-5
+    flash.tolerance = 1e-8
     flash.max_iter = 150
 
     if flash_type == "h-v":
         flash.armijo_parameters["rho"] = 0.9
         flash.armijo_parameters["j_max"] = 150
+    elif flash_type == 'p-h':
+        flash.armijo_parameters["j_max"] = 70
 
     return mix, flash
 
@@ -951,10 +953,10 @@ def create_mixture_geo(
     flash = pp.composite.FlashNR(mix)
     flash.use_armijo = True
     flash.armijo_parameters["rho"] = 0.99
-    flash.armijo_parameters["j_max"] = 50
+    flash.armijo_parameters["j_max"] = 70
     flash.armijo_parameters["return_max"] = True
     flash.newton_update_chop = 1.0
-    flash.tolerance = 1e-7
+    flash.tolerance = 1e-8
     flash.max_iter = 200
 
     return mix, flash
@@ -1691,7 +1693,7 @@ def plot_root_regions(
     """A discrete plot for plotting the root cases."""
     # cmap = mpl.colors.ListedColormap(["yellow", "green", "blue", "indigo"])
     cmap = mpl.colors.ListedColormap(
-        np.array([GREY_COL, WHITE_COL, NA_COL, MPHASE_COL])
+        np.array([WHITE_COL, MPHASE_COL])
     )
     img = axis.pcolormesh(
         A_mesh,

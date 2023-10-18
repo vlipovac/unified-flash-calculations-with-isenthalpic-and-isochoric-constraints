@@ -51,26 +51,29 @@ from _config import (
     GEO_THERMO_DATA_PATH,
     calculate_geo_example_thermo,
     EXAMPLE_2_flash_type,
+    SPECIES_geo,
 )
 
 # Flags for which data should be computed, to avoid long waiting for re-computations
-COMPUTE_THERMO_DATA = True
-COMPUTE_PT_DATA = True
+COMPUTE_THERMO_DATA = False
+COMPUTE_PT_DATA = False
 COMPUTE_PH_DATA = True
-COMPUTE_HV_DATA = True
-COMPUTE_GEO_THERMO_DATA = True
-COMPUTE_GEO_DATA = True
+COMPUTE_HV_DATA = False
+COMPUTE_GEO_THERMO_DATA = False
+COMPUTE_GEO_DATA = False
 
 if __name__ == "__main__":
 
     total_time_start = time.time()
 
     logger.info("Fetching constant parameters ..\n")
-    species = pp.composite.load_species(SPECIES)
+    species = pp.composite.load_species(SPECIES_geo)
 
     comps = [
         pp.composite.peng_robinson.H2O.from_species(species[0]),
         pp.composite.peng_robinson.CO2.from_species(species[1]),
+        pp.composite.peng_robinson.H2S.from_species(species[2]),
+        pp.composite.peng_robinson.CO2.from_species(species[3]),
     ]
     eos = pp.composite.peng_robinson.PengRobinsonEoS(True)
     eos.components = comps
@@ -78,10 +81,13 @@ if __name__ == "__main__":
     for c in comps:
         logger.info(f"{c.name}\t{c.T_crit}\t{c.p_crit}\t{c.omega}\n")
     logger.info("Binary interaction parameters:\n")
-    bip = pp.composite.peng_robinson.load_bip(
-        comps[0].CASr_number, comps[1].CASr_number
-    )
-    logger.info(f"{comps[0].name} - {comps[1].name}: {bip}\n")
+
+    for i in range(len(SPECIES_geo)):
+        for k in range(i + 1, len(SPECIES_geo)):
+            bip = pp.composite.peng_robinson.load_bip(
+                comps[i].CASr_number, comps[k].CASr_number
+            )
+            logger.info(f"{comps[i].name} - {comps[k].name}: {bip}\n")
 
     data_path = f"{path()}/data/"
     if not os.path.isdir(data_path):

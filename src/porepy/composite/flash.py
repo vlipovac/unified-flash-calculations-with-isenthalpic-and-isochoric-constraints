@@ -425,7 +425,7 @@ class FlashSystemNR(ThermodynamicState):
         )
         # reg = safe_sum(reg) * 4
 
-        f = self._eta * nu + nu * nu + ( 10.1 * negativity_penalty + dot_part) / 2  # + reg / 2
+        f = self._eta * nu + nu * nu + ( 10. * negativity_penalty + dot_part) / 2  # + reg / 2
         return f
 
     @property
@@ -1087,7 +1087,7 @@ class FlashNR:
                     # initial temperature guess using pseudo-critical temperature
                     thd_state = self._pseudo_crit_T(thd_state)
                     thd_state = self._guess_fractions(
-                        thd_state, num_vals, num_iter=2, guess_K_values=True
+                        thd_state, num_vals, num_iter=3, guess_K_values=True
                     )
                     # Alternating guess for fractions and temperature
                     # successive-substitution-like
@@ -1123,7 +1123,7 @@ class FlashNR:
                 )
                 # update fractions with new guess
                 thd_state = self._guess_fractions(
-                    thd_state, num_vals, num_iter=1, guess_K_values=False
+                    thd_state, num_vals, num_iter=2, guess_K_values=False
                 )
                 # thd_state = self._guess_pT_for_hv_saha(
                 #     thd_state, num_vals, gas_phase_index

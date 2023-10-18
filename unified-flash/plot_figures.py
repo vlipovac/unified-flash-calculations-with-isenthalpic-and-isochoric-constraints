@@ -495,7 +495,7 @@ if __name__ == "__main__":
     x_vec_geo = np.unique(np.sort(np.array(x_points_geo)))
 
     x_geo, p_geo = np.meshgrid(x_vec_geo, p_vec_geo)
-    num_p_geo, num_h_geo = p_geo.shape
+    num_p_geo, num_x_geo = p_geo.shape
 
     split_geo = np.zeros(p_geo.shape)
     cx_result_geo = np.zeros(p_geo.shape)
@@ -505,7 +505,7 @@ if __name__ == "__main__":
     y_error_geo = np.zeros(p_geo.shape)
 
     for i in range(num_p_geo):
-        for j in range(num_h_geo):
+        for j in range(num_x_geo):
             p_ = p_geo[i, j]
             h_ = x_geo[i, j]
             idx = idx_map_geo[(p_, h_)]
@@ -609,6 +609,10 @@ if __name__ == "__main__":
                 for r_ in range(4):
                     if eos.regions[r_][0]:
                         regions[i, j] = r_
+                    # filtering out triple and double, since they are not visible due to
+                    # refinement
+                if eos.regions[0][0] or eos.regions[2][0]:
+                    regions[i, j] = 3
 
                 liq_root[i, j] = Z_L
                 gas_root[i, j] = Z_G
@@ -645,18 +649,18 @@ if __name__ == "__main__":
         axis.set_yticks(b_ticks)
         img = plot_root_regions(axis, A_mesh, B_mesh, regions, liq_root)
 
-        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
+        cax = axis.inset_axes([1.02, 0.4, 0.05, 0.2])
         cb_rr = fig.colorbar(img, ax=axis, cax=cax, orientation="vertical")
-        cb_rr.set_ticks([3 / 4 * k - 3 / 8 for k in range(1, 5)])
-        cb_rr.set_ticklabels(["triple", "1 root", "2 roots", "3 roots"])
+        cb_rr.set_ticks([3/4, 3/2 + 3/4])
+        cb_rr.set_ticklabels(["1\nroot", "3\nroots"])
 
         axis = fig.add_subplot(1, 2, 2)
         axis.set_box_aspect(1)
         axis.set_xlabel("A")
-        # axis.set_ylabel("B")
-        axis.set(yticklabels=[])
-        axis.set(ylabel=None)
-        axis.tick_params(left=False)
+        axis.set_ylabel("B")
+        # axis.set(yticklabels=[])
+        # axis.set(ylabel=None)
+        # axis.tick_params(left=False)
         axis.set_xticks(a_ticks)
         img = plot_root_extensions(
             axis,
@@ -665,29 +669,37 @@ if __name__ == "__main__":
             root_extensions,
         )
 
-        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
+        cax = axis.inset_axes([1.02, 0.2, 0.05, 0.6])
         cb_rr = fig.colorbar(img, ax=axis, cax=cax, orientation="vertical")
         cb_rr.set_ticks([3 / 4 * k - 3 / 8 for k in range(1, 5)])
         cb_rr.set_ticklabels(
             [
-                "no\nextension",
+                "not\nextended",
                 "liquid\nextended",
                 "gas\nextended\n(Widom)",
                 "gas\nextended",
             ]
         )
-        fig.text(
-            0.55, 0.6, "supercrit.\nliq. extension", fontsize=rcParams["axes.titlesize"]
+        axis.text(
+            0.1,
+            0.08,
+            "supercritical\nliquid extension\nEquation (4.9)",
+            fontsize=rcParams["axes.titlesize"]
         )
-        fig.text(
-            0.77, 0.6, "supercrit.\ngas extension", fontsize=rcParams["axes.titlesize"]
+        axis.text(
+            0.64,
+            0.105,
+            "supercritical\ngas extension\nEquation (4.8)",
+            fontsize=rcParams["axes.titlesize"]
         )
-        fig.text(
-            0.72,
-            0.25,
-            "subcrit.\nextension\n(Ben Gharbia)",
+        axis.text(
+            0.45,
+            0.03,
+            "subcritical\nextensions\nEquation (4.5)",
             fontsize=rcParams["axes.titlesize"],
         )
+        axis.arrow(0.42, 0.04, -0.07, 0.015, linewidth=0.5, head_width=0.005, color='black')
+        axis.arrow(0.42, 0.04, -0.05, -0.02, linewidth=0.5, head_width=0.005, color='black')
 
         fig.tight_layout(pad=FIG_PAD)
         fig.savefig(
@@ -833,7 +845,9 @@ if __name__ == "__main__":
         axis.set_box_aspect(1)
         axis.set_xlabel("T [K]")
         axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        img = plot_abs_error_pT(axis, p, T, err_gas_frac)
+        vmax = err_gas_frac.max()
+        norm = mpl.colors.LogNorm(vmin=ERROR_CAP, vmax=vmax, clip=True)
+        img = plot_abs_error_pT(axis, p, T, err_gas_frac, norm=norm)
 
         img_ = []
         leg_ = []
@@ -862,9 +876,13 @@ if __name__ == "__main__":
             format=ticker.FuncFormatter(_fmt),
         )
         cbt = cb.get_ticks()
-        cbt = cbt[cbt < err_gas_frac.max()]
-        cbt = np.sort(np.hstack([cbt, np.array([err_gas_frac.max()])]))
+        cbt = cbt[cbt < vmax]
+        cbt = np.sort(np.hstack([cbt, np.array([vmax])]))
         cb.set_ticks(cbt)
+        # cbt = cb.get_ticks()
+        # cbt = cbt[cbt < err_gas_frac.max()]
+        # cbt = np.sort(np.hstack([cbt, np.array([err_gas_frac.max()])]))
+        # cb.set_ticks(cbt)
 
         fig.tight_layout(pad=FIG_PAD)
         fig.savefig(
@@ -1004,7 +1022,7 @@ if __name__ == "__main__":
         err_y_l2[err_y_l2 < ERROR_CAP] = ERROR_CAP
 
         logger.info(f"{del_log}Plotting L2 errors for isenthalpic flash ..")
-        fig = plt.figure(figsize=(FIGURE_WIDTH, ASPECT_RATIO * 0.5 * FIGURE_WIDTH))
+        fig = plt.figure(figsize=(FIGURE_WIDTH, ASPECT_RATIO * 0.6 * FIGURE_WIDTH))
         axis = fig.add_subplot(1, 1, 1)
         axis.set_box_aspect(0.5)
         axis.set_xlabel("T [K]")
@@ -1142,7 +1160,7 @@ if __name__ == "__main__":
 
         # region Plotting h-v isolines
         logger.info(f"{del_log}Plotting h-v flash isolines ..")
-        fig = plt.figure(figsize=(FIGURE_WIDTH, 0.5 * ASPECT_RATIO * FIGURE_WIDTH))
+        fig = plt.figure(figsize=(FIGURE_WIDTH, 0.6 * ASPECT_RATIO * FIGURE_WIDTH))
         axis = fig.add_subplot(1, 1, 1)
         axis.set_box_aspect(0.5)
         axis.set_xlabel("T [K]")
@@ -1250,7 +1268,7 @@ if __name__ == "__main__":
         img_, leg_ = plot_max_iter_reached(
             axis, p_geo, x_geo * X_SCALE, max_iter_reached_geo
         )
-        print(f"Number of max iter reached (2nd example):\n{max_iter_reached_geo.sum()} / {num_p_geo * num_h_geo}")
+        print(f"Number of max iter reached (2nd example):\n{max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}")
         axis.legend(
             img_, leg_, loc="upper left", markerscale=MARKER_SCALE
         )
@@ -1288,6 +1306,122 @@ if __name__ == "__main__":
 
         # fig.tight_layout(pad=FIG_PAD)
         fig.tight_layout()
+        fig.savefig(
+            f"{fig_path}figure_{fig_num}.{FIGURE_FORMAT}",
+            format=FIGURE_FORMAT,
+            dpi=DPI,
+        )
+        fig_num += 1
+        # endregion
+
+        # region errors in y and T
+        fig = plt.figure(figsize=(2 * FIGURE_WIDTH, ASPECT_RATIO * FIGURE_WIDTH))
+        axis = fig.add_subplot(1, 2, 1)
+        axis.set_box_aspect(1)
+        axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
+        if EXAMPLE_2_flash_type == 'p-h':
+            axis.set_xlabel(f"h [{X_SCALE_NAME}]")
+        else:
+            axis.set_xlabel("T [K]")
+
+        y_error_geo[y_error_geo == y_error_geo.max()] = 0.
+        img = plot_abs_error_pT(
+            # axis, p_geo, x_geo * ENTHALPY_SCALE, num_iter_geo, norm=None
+            axis, p_geo, x_geo * X_SCALE, y_error_geo, norm=None
+        )
+        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
+        cb = fig.colorbar(
+            img,
+            ax=axis,
+            cax=cax,
+            orientation="vertical",  # format=ticker.FuncFormatter(_fmt),
+        )
+
+        mr = np.ma.array(split_geo, mask=np.logical_not(split_geo == 3))
+        hatch = axis.pcolor(
+            x_geo * X_SCALE,
+            p_geo * PRESSURE_SCALE,
+            mr,
+            hatch="//",
+            edgecolor="black",
+            cmap=mpl.colors.ListedColormap(["none"]),
+            facecolor="none",
+            vmin=0,
+            vmax=3,
+            shading="nearest",
+            lw=0,
+            zorder=2,
+        )
+        img_v = [hatch]
+        leg_v = [f"gas phase"]
+        axis.legend(img_v, leg_v, loc="upper left", markerscale=MARKER_SCALE)
+
+
+        axis = fig.add_subplot(1, 2, 2)
+        axis.set_box_aspect(1)
+        axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
+        if EXAMPLE_2_flash_type == 'p-h':
+            axis.set_xlabel(f"h [{X_SCALE_NAME}]")
+        else:
+            axis.set_xlabel("T [K]")
+        img = plot_conjugate_x_for_px_flash(axis, p_geo, x_geo, cx_result_geo)
+        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
+        cb = fig.colorbar(
+            img,
+            ax=axis,
+            cax=cax,
+            orientation="vertical",
+        )
+        cx_max = cx_result_geo.max()
+        cx_min = cx_result_geo.min()
+        smallest, nextsmallest, *_ = np.partition(cx_result_geo[cx_result_geo >= 0].flatten(), 1)
+        cbt = np.linspace(nextsmallest, cx_max, 5, endpoint=True)
+        cbt = np.unique(np.sort(np.hstack([cbt, np.array([cx_min])])))
+        cb.set_ticks(cbt.astype(int))
+
+        # fig.tight_layout(pad=FIG_PAD)
+        fig.tight_layout()
+        fig.savefig(
+            f"{fig_path}figure_{fig_num}.{FIGURE_FORMAT}",
+            format=FIGURE_FORMAT,
+            dpi=DPI,
+        )
+        fig_num += 1
+        # endregion
+
+        # region Number of iterations
+        logger.info(f"{del_log}Plotting iteration numbers for second example ..")
+        fig = plt.figure(figsize=(FIGURE_WIDTH, ASPECT_RATIO * FIGURE_WIDTH))
+        axis = fig.add_subplot(1, 1, 1)
+        axis.set_box_aspect(1)
+        axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
+        if EXAMPLE_2_flash_type == 'p-h':
+            axis.set_xlabel(f"h [{X_SCALE_NAME}]")
+        else:
+            axis.set_xlabel("T [K]")
+
+        img = plot_abs_error_pT(
+            axis, p_geo, x_geo * X_SCALE, num_iter_geo, norm=None
+        )
+        img_, leg_ = plot_max_iter_reached(axis, p_geo, x_geo * X_SCALE, max_iter_reached_geo)
+        print(f"Number of max iter reached (1st example):\n{max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}")
+        axis.legend(
+            img_, leg_, loc="upper left", markerscale=MARKER_SCALE
+        )
+
+        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
+        cb = fig.colorbar(
+            img,
+            ax=axis,
+            cax=cax,
+            orientation="vertical",  # format=ticker.FuncFormatter(_fmt),
+        )
+        cbt = cb.get_ticks()
+        cbt = np.sort(np.hstack([cbt, np.array([num_iter_geo.max()])]))
+        cbt = cbt[cbt <= num_iter_geo.max()]
+        cb.set_ticks(cbt.astype(int))
+
+        fig.tight_layout(pad=FIG_PAD)
         fig.savefig(
             f"{fig_path}figure_{fig_num}.{FIGURE_FORMAT}",
             format=FIGURE_FORMAT,
