@@ -93,7 +93,9 @@ ERROR_CAP = 1e-10
 
 # Skip calculation of root data for A-B plot for performance
 PLOT_ROOTS: bool = True
+# Plots for water-CO2 mixture
 PLOT_FIRST_EXAMPLE: bool = True
+# plots for multicomponent mixture
 PLOT_SECOND_EXAMPLE: bool = True
 
 # Padding from figure borders

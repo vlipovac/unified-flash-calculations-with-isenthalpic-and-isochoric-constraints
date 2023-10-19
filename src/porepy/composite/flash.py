@@ -829,7 +829,7 @@ class FlashNR:
 
         - ``'eta': 0.5``
         - ``'u': 1.``
-        - ``'w'``: additional parameter to emphasize the negativity penaly
+        - ``'w': 1``: additional parameter to emphasize the negativity penaly
 
         Values can be set directly by modifying the values of this dictionary.
 
