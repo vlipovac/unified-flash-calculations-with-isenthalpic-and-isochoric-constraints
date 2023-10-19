@@ -7,9 +7,9 @@ Warning:
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
-import os
 import time
 
 import numpy as np
@@ -20,6 +20,8 @@ import porepy as pp
 sys.path.append(str(pathlib.Path(__file__).parent.resolve()))
 
 from _config import (
+    GEO_DATA_PATH,
+    GEO_THERMO_DATA_PATH,
     HV_FLASH_DATA_PATH,
     HV_ISOBAR,
     HV_ISOBAR_DATA_PATH,
@@ -32,35 +34,32 @@ from _config import (
     P_LIMITS_ISOTHERMS,
     PH_FLASH_DATA_PATH,
     PT_FLASH_DATA_PATH,
-    SPECIES,
     T_HEADER,
     THERMO_DATA_PATH,
+    EXAMPLE_2_flash_type,
     RESOLUTION_hv,
     RESOLUTION_ph,
+    SPECIES_geo,
+    calculate_geo_example,
+    calculate_geo_example_thermo,
     calculate_porepy_data,
     calculate_thermo_pT_data,
     h_HEADER,
     logger,
     p_HEADER,
+    path,
     read_data_column,
     v_HEADER,
     write_results,
-    path,
-    GEO_DATA_PATH,
-    calculate_geo_example,
-    GEO_THERMO_DATA_PATH,
-    calculate_geo_example_thermo,
-    EXAMPLE_2_flash_type,
-    SPECIES_geo,
 )
 
 # Flags for which data should be computed, to avoid long waiting for re-computations
-COMPUTE_THERMO_DATA = False
-COMPUTE_PT_DATA = False
+COMPUTE_THERMO_DATA = True
+COMPUTE_PT_DATA = True
 COMPUTE_PH_DATA = True
-COMPUTE_HV_DATA = False
-COMPUTE_GEO_THERMO_DATA = False
-COMPUTE_GEO_DATA = False
+COMPUTE_HV_DATA = True
+COMPUTE_GEO_THERMO_DATA = True
+COMPUTE_GEO_DATA = True
 
 if __name__ == "__main__":
 

@@ -8,8 +8,8 @@ from typing import Any, Callable, Literal, Optional, overload
 
 import numpy as np
 import pypardiso
-import scipy.sparse as sps
 import scipy.optimize as spo
+import scipy.sparse as sps
 
 import porepy as pp
 from porepy.numerics.ad.operator_functions import NumericType
@@ -17,10 +17,10 @@ from porepy.numerics.ad.operator_functions import NumericType
 from ._core import (
     R_IDEAL,
     _rr_pole,
+    rachford_rice_equation,
     rachford_rice_feasible_region,
     rachford_rice_potential,
     rachford_rice_vle_inversion,
-    rachford_rice_equation,
 )
 from .composite_utils import safe_sum
 from .heuristics import K_val_Wilson
@@ -171,6 +171,7 @@ class FlashSystemNR(ThermodynamicState):
             self._num_vars += 1  # slack variable is independent
             self._eta = npipm.get("eta", 0.5)
             self._u = npipm.get("u", 1.0)
+            self._w = npipm.get("w", 1.0)
             self._uses_npipm = True
 
             # assembling slack variable
@@ -424,8 +425,9 @@ class FlashSystemNR(ThermodynamicState):
             / self._num_phases**2
         )
         # reg = safe_sum(reg) * 4
-
-        f = self._eta * nu + nu * nu + ( 10. * negativity_penalty + dot_part) / 2  # + reg / 2
+        f = (
+            self._eta * nu + nu * nu + (self._w * negativity_penalty + dot_part) / 2
+        )  # + reg / 2
         return f
 
     @property
@@ -783,7 +785,6 @@ class FlashNR:
 
     def __init__(self, mixture: NonReactiveMixture) -> None:
 
-
         self._T_guess: Optional[float] = None
         """For debugging the p-h initialization."""
         ### PUBLIC
@@ -821,12 +822,14 @@ class FlashNR:
         self.npipm_parameters: dict[str, float] = {
             "eta": 0.5,
             "u": 1,
+            "w": 1.0,
         }
         """A dictionary containing per parameter name (str, key) the respective
         parameter for the NPIPM:
 
         - ``'eta': 0.5``
         - ``'u': 1.``
+        - ``'w'``: additional parameter to emphasize the negativity penaly
 
         Values can be set directly by modifying the values of this dictionary.
 
@@ -1471,7 +1474,10 @@ class FlashNR:
                 # multi-component: RR solution approximated
                 else:
                     # Callable representing the rachford rice equation
-                    assert num_vals == 1, "Vectorized, multi-component fraction guess not supported."
+                    assert (
+                        num_vals == 1
+                    ), "Vectorized, multi-component fraction guess not supported."
+
                     def _rr(y):
                         return rachford_rice_equation(0, state.z, [y], K)[0]
 
@@ -1488,22 +1494,22 @@ class FlashNR:
                     # avoid evaluation at poles with some threshold
                     tol_ = 1e-4
                     beta_min += tol_
-                    beta_max -= tol_ 
+                    beta_max -= tol_
 
-                    if beta_max <= 0.:
+                    if beta_max <= 0.0:
                         # special treatment if all poles are in negative half-space
                         # then the graph of _rr is monotonously decreasing in (0, infty)
                         # if negative at y=1. + eps, than there is a root between 0 and 1
                         # if positive, Brent's method does not work (no opposite signs)
                         # then just make it invalid and let below correction do its work
-                        test = _rr(1. + tol_)
-                        if test < 0.:
-                            y = np.array([spo.brentq(_rr, beta_min[0], 1. + tol_)])
+                        test = _rr(1.0 + tol_)
+                        if test < 0.0:
+                            y = np.array([spo.brentq(_rr, beta_min[0], 1.0 + tol_)])
                         else:
                             y = 1.1
                     else:
                         y = np.array([spo.brentq(_rr, beta_min[0], beta_max[0])])
-                    
+
                 negative = y < 0.0
                 exceeds = y > 1.0
                 invalid = negative | exceeds

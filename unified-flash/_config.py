@@ -71,10 +71,10 @@ RESOLUTION_pT: int = 80
 
 # temperature values for isotherms for p-h calculations
 # more refined around critical temperature of water, up to critical pressure of water
-ISOTHERMS: list[float] = [500.0, 550.0, 600, 645.0, 647.14, 650.0]
+ISOTHERMS: list[float] = [500.0, 550.0, 600, 640.0, 647.14, 650.0]
 P_LIMITS_ISOTHERMS: list[float] = [1e6, 23000000.0]
 # pressure resolution along isotherms
-RESOLUTION_ph: int = 40
+RESOLUTION_ph: int = 20
 
 # Isobar and isotherm for h-v calculations
 HV_ISOBAR: float = 15e6
@@ -82,15 +82,15 @@ HV_ISOBAR_T_LIMITS: list[float] = [575, 630]
 HV_ISOTHERM: float = 575.0
 HV_ISOTHERM_P_LIMITS: list[float] = [5e6, 15e6]
 # pressure and temperature resolution for isobar and isotherm for h-v flash
-RESOLUTION_hv: int = 20
+RESOLUTION_hv: int = 10
 
 # Pressure and enthalpy limits for multi-component, geothermal fluid example
 GEO_P_LIMITS: list[float] = [20e6, 27e6]  # [Pa]
 # GEO_H_LIMITS: list[float] = [-15e3, 15e3]  # [kJ]
 GEO_H_LIMITS: list[float] = [-15e3, 8e3]  # [kJ]
 GEO_T_LIMITS: list[float] = [500, 820]
-EXAMPLE_2_flash_type: str = 'p-h'  # p-T or p-h
-RESOLUTION_geo: int = 50
+EXAMPLE_2_flash_type: str = "p-h"  # p-T or p-h
+RESOLUTION_geo: int = 40
 
 # Limits for A and B when plotting te roots
 A_LIMITS: list[float] = [0, 2 * pp.composite.peng_robinson.PengRobinsonEoS.A_CRIT]
@@ -107,7 +107,7 @@ WIDOM_LINE: list[np.ndarray] = [
 PRESSURE_SCALE: float = 1e-6  # Pa to MPa
 PRESSURE_SCALE_NAME: str = "MPa"
 # scaling of pressure or temperature for plots for second example
-X_SCALE: float = 1e-3  if EXAMPLE_2_flash_type == 'p-h' else 1. # J to kJ for p-h
+X_SCALE: float = 1e-3 if EXAMPLE_2_flash_type == "p-h" else 1.0  # J to kJ for p-h
 X_SCALE_NAME: str = "kJ"
 
 # paths to where results should be stored
@@ -125,7 +125,9 @@ HV_ISOBAR_DATA_PATH: str = (
 )
 HV_FLASH_DATA_PATH: str = "data/flash_hv.csv"  # storing h-v results from porepy
 GEO_DATA_PATH: str = "data/flash_geo.csv"  # storing p-h results for geothermal model
-GEO_THERMO_DATA_PATH: str = "data/thermo_geo.csv"  # storing thermo results for geothermal model
+GEO_THERMO_DATA_PATH: str = (
+    "data/thermo_geo.csv"  # storing thermo results for geothermal model
+)
 FIG_PATH: str = "figs/"  # path to folder containing plots
 
 NUM_COMP: int = len(SPECIES)  # number of components
@@ -273,7 +275,7 @@ def write_results(filename: str, results: dict[str, list]):
     logger.info(f"{del_log}Writing result data: done\n")
 
 
-def _thermo_init(species = SPECIES) -> FlashVLN:
+def _thermo_init(species=SPECIES) -> FlashVLN:
     """Helper function to initiate the thermo flash."""
     constants, properties = ChemicalConstantsPackage.from_IDs(species)
     kijs = IPDB.get_ip_asymmetric_matrix("ChemSep PR", constants.CASs, "kij")
@@ -301,9 +303,7 @@ def _thermo_init(species = SPECIES) -> FlashVLN:
 
 
 def _init_empty_results(
-    species = SPECIES,
-    comp_header = composition_HEADER,
-    fug_header = fugacity_HEADER
+    species=SPECIES, comp_header=composition_HEADER, fug_header=fugacity_HEADER
 ) -> dict[str, list]:
     """Initiate and return an results dict with proper headers as needed for the
     comparison."""
@@ -322,12 +322,8 @@ def _init_empty_results(
     results.update({gas_frac_HEADER: list()})
     results.update(dict([(liq_frac_HEADER[i], list()) for i in range(NUM_COMP)]))
     results.update(dict([(compressibility_HEADER[j], list()) for j in PHASES]))
-    results.update(
-        dict([(comp_header[i][j], list()) for j in PHASES for i in species])
-    )
-    results.update(
-        dict([(fug_header[i][j], list()) for j in PHASES for i in species])
-    )
+    results.update(dict([(comp_header[i][j], list()) for j in PHASES for i in species]))
+    results.update(dict([(fug_header[i][j], list()) for j in PHASES for i in species]))
 
     return results
 
@@ -501,9 +497,7 @@ def _thermo_parse_result(state) -> dict:
 
 
 def _failed_entry(
-    species = SPECIES,
-    comp_header = composition_HEADER,
-    fug_header = fugacity_HEADER
+    species=SPECIES, comp_header=composition_HEADER, fug_header=fugacity_HEADER
 ) -> dict[str]:
     """Create a row-entry for failed flashes."""
     failed: dict = _init_empty_results(species, comp_header, fug_header)
@@ -556,7 +550,7 @@ def calculate_thermo_pT_data() -> dict[str, list]:
     return results
 
 
-def calculate_geo_example_thermo(flash_type: str = 'p-h') -> dict[str, list]:
+def calculate_geo_example_thermo(flash_type: str = "p-h") -> dict[str, list]:
     """Uses thermo to perform the p-T flash for various pressure and temperature ranges.
 
     Returns a dictionary containing per header (name of some property) respective values
@@ -565,7 +559,9 @@ def calculate_geo_example_thermo(flash_type: str = 'p-h') -> dict[str, list]:
     """
 
     flasher = _thermo_init(SPECIES_geo)
-    results = _init_empty_results(SPECIES_geo, composition_HEADER_geo, fugacity_HEADER_geo)
+    results = _init_empty_results(
+        SPECIES_geo, composition_HEADER_geo, fugacity_HEADER_geo
+    )
 
     p_points = np.linspace(
         GEO_P_LIMITS[0],
@@ -575,7 +571,7 @@ def calculate_geo_example_thermo(flash_type: str = 'p-h') -> dict[str, list]:
         dtype=float,
     ).tolist()
 
-    if flash_type == 'p-h':
+    if flash_type == "p-h":
         x_points = np.linspace(
             GEO_H_LIMITS[0],
             GEO_H_LIMITS[1],
@@ -583,7 +579,7 @@ def calculate_geo_example_thermo(flash_type: str = 'p-h') -> dict[str, list]:
             endpoint=True,
             dtype=float,
         ).tolist()
-    elif flash_type == 'p-T':
+    elif flash_type == "p-T":
         x_points = np.linspace(
             GEO_T_LIMITS[0],
             GEO_T_LIMITS[1],
@@ -592,7 +588,7 @@ def calculate_geo_example_thermo(flash_type: str = 'p-h') -> dict[str, list]:
             dtype=float,
         ).tolist()
     else:
-        raise ValueError('Only p-T or p-h flash supported for this example.')
+        raise ValueError("Only p-T or p-h flash supported for this example.")
 
     f_num = len(x_points) * len(p_points)
     f_count = 1
@@ -600,19 +596,25 @@ def calculate_geo_example_thermo(flash_type: str = 'p-h') -> dict[str, list]:
     for X in x_points:
         for P in p_points:
             try:
-                if flash_type == 'p-T':
+                if flash_type == "p-T":
                     state = flasher.flash(P=P, T=X, zs=FEED_geo)
                 else:
                     state = flasher.flash(P=P, H=X, zs=FEED_geo)
             except Exception:
-                logger.warn(f"\nThermo {flash_type} flash failed for p, x = ({P}, {X})\n")
-                parsed = _failed_entry(SPECIES_geo, composition_HEADER_geo, fugacity_HEADER_geo)
+                logger.warn(
+                    f"\nThermo {flash_type} flash failed for p, x = ({P}, {X})\n"
+                )
+                parsed = _failed_entry(
+                    SPECIES_geo, composition_HEADER_geo, fugacity_HEADER_geo
+                )
             else:
                 # parsed = _thermo_parse_result(state)
-                parsed = _failed_entry(SPECIES_geo, composition_HEADER_geo, fugacity_HEADER_geo)
+                parsed = _failed_entry(
+                    SPECIES_geo, composition_HEADER_geo, fugacity_HEADER_geo
+                )
                 parsed[success_HEADER] = 0
                 # in the p-T flash, we use the thermo enthalpy also as target enthalpy
-                if flash_type == 'p-h':
+                if flash_type == "p-h":
                     parsed[T_HEADER] = state.T
                 else:
                     parsed[h_HEADER] = state.H()
@@ -620,28 +622,30 @@ def calculate_geo_example_thermo(flash_type: str = 'p-h') -> dict[str, list]:
                 ph = ""
                 pc = state.phase_count
                 if (0.0 < state.VF <= 1.0) and state.gas is not None:
-                    ph += 'G'
+                    ph += "G"
                     if pc > 1:
                         for _ in range(pc - 1):
-                            ph += 'L'
+                            ph += "L"
 
                     # parsing gas phase composition
                     for i, s in enumerate(SPECIES_geo):
                         parsed[composition_HEADER_geo[s][PHASES[0]]] = state.gas.zs[i]
                 else:
                     for _ in range(pc):
-                        ph += 'L'
+                        ph += "L"
                 # parsing liquid phase (one expected)
-                if state.VF < 1.:
+                if state.VF < 1.0:
                     if len(state.liquids) == 1:
                         for i, s in enumerate(SPECIES_geo):
-                            parsed[composition_HEADER_geo[s][PHASES[1]]] = state.liquids[0].zs[i]
+                            parsed[
+                                composition_HEADER_geo[s][PHASES[1]]
+                            ] = state.liquids[0].zs[i]
 
                 parsed[phases_HEADER] = ph
                 parsed[num_iter_HEADER] = 0
             finally:
                 parsed[p_HEADER] = P
-                if flash_type == 'p-h':
+                if flash_type == "p-h":
                     parsed[h_HEADER] = X
                 else:
                     parsed[T_HEADER] = X
@@ -909,6 +913,7 @@ def create_mixture(
     flash.armijo_parameters["rho"] = 0.99
     flash.armijo_parameters["j_max"] = 50
     flash.armijo_parameters["return_max"] = True
+    flash.npipm_parameters["w"] = 10.0
     flash.newton_update_chop = 1.0
     flash.tolerance = 1e-8
     flash.max_iter = 150
@@ -916,8 +921,9 @@ def create_mixture(
     if flash_type == "h-v":
         flash.armijo_parameters["rho"] = 0.9
         flash.armijo_parameters["j_max"] = 150
-    elif flash_type == 'p-h':
+    elif flash_type == "p-h":
         flash.armijo_parameters["j_max"] = 70
+        flash.npipm_parameters["w"] = 1.0
 
     return mix, flash
 
@@ -955,9 +961,10 @@ def create_mixture_geo(
     flash.armijo_parameters["rho"] = 0.99
     flash.armijo_parameters["j_max"] = 70
     flash.armijo_parameters["return_max"] = True
+    flash.npipm_parameters["w"] = 1.0
     flash.newton_update_chop = 1.0
     flash.tolerance = 1e-8
-    flash.max_iter = 200
+    flash.max_iter = 150
 
     return mix, flash
 
@@ -1143,9 +1150,7 @@ def _parallel_porepy_flash(args):
 
 
 def _parallel_porepy_flash_geo(args):
-    """Analogon to ''_parallel_porepy_flash`` for the geothermal fluid mixture
-
-    """
+    """Analogon to ''_parallel_porepy_flash`` for the geothermal fluid mixture"""
 
     i, state_1, state_2, flash_type, use_thermo_init = args
     msg = (i, state_1, state_2)
@@ -1222,7 +1227,7 @@ def _parallel_porepy_flash_geo(args):
     elif flash_type == "h-v":
         state_input = {"h": np.array([state_1]), "v": np.array([state_2])}
 
-    if use_thermo_init and flash_type == 'p-h':  # use only for p-h flash for debug
+    if use_thermo_init and flash_type == "p-h":  # use only for p-h flash for debug
         thermo_flash = _thermo_init(SPECIES_geo)
         thermo_r = thermo_flash.flash(P=state_1, H=state_2, zs=FEED_geo)
         flash._T_guess = float(thermo_r.T)
@@ -1470,7 +1475,7 @@ def calculate_porepy_data(
     return results
 
 
-def calculate_geo_example(flash_type: str = 'p-h', use_thermo_for_init: bool = False):
+def calculate_geo_example(flash_type: str = "p-h", use_thermo_for_init: bool = False):
     p_ = np.linspace(
         GEO_P_LIMITS[0],
         GEO_P_LIMITS[1],
@@ -1479,7 +1484,7 @@ def calculate_geo_example(flash_type: str = 'p-h', use_thermo_for_init: bool = F
         dtype=float,
     )
 
-    if flash_type == 'p-h':
+    if flash_type == "p-h":
         x_ = np.linspace(
             GEO_H_LIMITS[0],
             GEO_H_LIMITS[1],
@@ -1487,7 +1492,7 @@ def calculate_geo_example(flash_type: str = 'p-h', use_thermo_for_init: bool = F
             endpoint=True,
             dtype=float,
         )
-    elif flash_type == 'p-T':
+    elif flash_type == "p-T":
         x_ = np.linspace(
             GEO_T_LIMITS[0],
             GEO_T_LIMITS[1],
@@ -1496,7 +1501,7 @@ def calculate_geo_example(flash_type: str = 'p-h', use_thermo_for_init: bool = F
             dtype=float,
         )
     else:
-        raise ValueError('Only p-T or p-h flash supported for this example.')
+        raise ValueError("Only p-T or p-h flash supported for this example.")
 
     x, p = np.meshgrid(x_, p_)
 
@@ -1522,9 +1527,7 @@ def calculate_geo_example(flash_type: str = 'p-h', use_thermo_for_init: bool = F
         )
         prog_process.start()
 
-        chunksize = np.array(
-            [NUM_PHYS_CPU_CORS, RESOLUTION_geo]
-        ).min()
+        chunksize = np.array([NUM_PHYS_CPU_CORS, RESOLUTION_geo]).min()
         result = pool.map_async(_parallel_porepy_flash_geo, args, chunksize=chunksize)
 
         # Wait for some time and see if processes terminate as they should
@@ -1692,9 +1695,7 @@ def plot_root_regions(
 ):
     """A discrete plot for plotting the root cases."""
     # cmap = mpl.colors.ListedColormap(["yellow", "green", "blue", "indigo"])
-    cmap = mpl.colors.ListedColormap(
-        np.array([WHITE_COL, MPHASE_COL])
-    )
+    cmap = mpl.colors.ListedColormap(np.array([WHITE_COL, MPHASE_COL]))
     img = axis.pcolormesh(
         A_mesh,
         B_mesh,
@@ -1832,6 +1833,7 @@ def plot_phase_split_GnL(
     )
 
     return img
+
 
 def plot_conjugate_x_for_px_flash(
     axis: plt.Axes,

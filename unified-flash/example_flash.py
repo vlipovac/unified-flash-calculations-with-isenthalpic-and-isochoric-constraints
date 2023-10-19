@@ -17,13 +17,13 @@ chems = ["H2O", "CO2", "H2S", "N2"]
 
 vec = np.ones(1)
 # feed fractions
-z = [vec * 0.8,  vec * 0.05, vec * 0.1, vec * 0.05]
+z = [vec * 0.8, vec * 0.05, vec * 0.1, vec * 0.05]
 # pressure
 p = vec * 20368421.05263158
 # temperature
 T = vec * 350.0
 # enthalpy
-h = vec  * 11368.421052631578
+h = vec * 11368.421052631578
 # verbosity for logs during flash
 verbosity = 2
 

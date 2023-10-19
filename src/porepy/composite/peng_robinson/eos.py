@@ -454,7 +454,7 @@ class PengRobinsonEoS(AbstractEoS):
                 bip = load_bip(comp_i.CASr_number, comp_j.CASr_number)
                 # TODO: This needs some more thought. How to handle missing BIPs?
                 if bip == 0.0:
-                    logger.warn(
+                    logger.info(
                         "Loaded a BIP with zero value for"
                         + f" components {comp_i.name} and {comp_j.name}."
                     )
@@ -985,7 +985,7 @@ class PengRobinsonEoS(AbstractEoS):
 
         """
         return (1 - B - Z) / 2
-    
+
     @staticmethod
     def extended_root_gas_sc(B: NumericType, Z: NumericType) -> NumericType:
         """Auxiliary function implementing the formula for the extended, supercritical
@@ -1196,11 +1196,19 @@ class PengRobinsonEoS(AbstractEoS):
 
                 # compute normal distance of extended gas root in supercritical area
                 # to line B = B_CRIT
-                a = A_.val[gas_ext_supc] if isinstance(A_, pp.ad.AdArray) else A_[gas_ext_supc]
-                b = B_.val[gas_ext_supc] if isinstance(B_, pp.ad.AdArray) else B_[gas_ext_supc]
+                a = (
+                    A_.val[gas_ext_supc]
+                    if isinstance(A_, pp.ad.AdArray)
+                    else A_[gas_ext_supc]
+                )
+                b = (
+                    B_.val[gas_ext_supc]
+                    if isinstance(B_, pp.ad.AdArray)
+                    else B_[gas_ext_supc]
+                )
                 ab = np.array([a, b])
 
-                d_g  = _point_to_line_distance(ab, self._B_crit_points)
+                d_g = _point_to_line_distance(ab, self._B_crit_points)
 
                 # smoothing towards subcritical region (Gharbia extension)
                 smooth = (d_g < smoothing_distance) & (b >= self.B_CRIT)
@@ -1215,8 +1223,16 @@ class PengRobinsonEoS(AbstractEoS):
 
                 # compute normal distance of extended liquid root to critical line and
                 # normal line and chose the smaller one
-                a = A_.val[liq_ext_supc] if isinstance(A_, pp.ad.AdArray) else A_[liq_ext_supc]
-                b = B_.val[liq_ext_supc] if isinstance(B_, pp.ad.AdArray) else B_[liq_ext_supc]
+                a = (
+                    A_.val[liq_ext_supc]
+                    if isinstance(A_, pp.ad.AdArray)
+                    else A_[liq_ext_supc]
+                )
+                b = (
+                    B_.val[liq_ext_supc]
+                    if isinstance(B_, pp.ad.AdArray)
+                    else B_[liq_ext_supc]
+                )
                 ab = np.array([a, b])
                 d_w = _point_to_line_distance(ab, self._widom_points)
                 d_s = _point_to_line_distance(ab, self._critline_points)
@@ -1229,7 +1245,7 @@ class PengRobinsonEoS(AbstractEoS):
                 # smoothing towards subcritical Ben Gharbia extension
                 smooth = (d_s < smoothing_distance) & (b < self.B_CRIT)
                 d = d_s / smoothing_distance
-                w_l[smooth] = (w_sub * (1-d) + w_l * d)[smooth]
+                w_l[smooth] = (w_sub * (1 - d) + w_l * d)[smooth]
 
                 w[liq_ext_supc] = w_l
 

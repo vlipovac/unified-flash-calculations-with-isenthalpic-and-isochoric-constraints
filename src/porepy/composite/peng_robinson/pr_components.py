@@ -204,7 +204,7 @@ class N2(Component_PR):
         def bip_water(T: NumericType) -> tuple[NumericType, NumericType]:
             return 0.385438, 0
 
-        self.bip_map = {cas_water: bip_water}
+        # self.bip_map = {cas_water: bip_water}
 
     def h_ideal(self, p: NumericType, T: NumericType) -> NumericType:
         """The specific molar enthalpy of is constructed using

@@ -8,9 +8,9 @@ Figures are stored in ``figs/``, numbered as in the publication.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
-import os
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -30,6 +30,8 @@ from _config import (
     FIG_PATH,
     FIGURE_FORMAT,
     FIGURE_WIDTH,
+    GEO_DATA_PATH,
+    GEO_THERMO_DATA_PATH,
     HV_FLASH_DATA_PATH,
     HV_ISOBAR,
     HV_ISOBAR_DATA_PATH,
@@ -51,6 +53,9 @@ from _config import (
     SPECIES,
     T_HEADER,
     THERMO_DATA_PATH,
+    X_SCALE,
+    X_SCALE_NAME,
+    EXAMPLE_2_flash_type,
     RESOLUTION_ph,
     composition_HEADER,
     conditioning_HEADER,
@@ -66,6 +71,7 @@ from _config import (
     path,
     phases_HEADER,
     plot_abs_error_pT,
+    plot_conjugate_x_for_px_flash,
     plot_crit_point_H2O,
     plot_hv_iso,
     plot_max_iter_reached,
@@ -77,13 +83,6 @@ from _config import (
     read_results,
     success_HEADER,
     v_HEADER,
-    GEO_DATA_PATH,
-    X_SCALE,
-    X_SCALE_NAME,
-    plot_conjugate_x_for_px_flash,
-    GEO_THERMO_DATA_PATH,
-    plot_phase_split_GnL,
-    EXAMPLE_2_flash_type,
 )
 
 # Max iter number, for visualization of respective plot
@@ -93,7 +92,7 @@ MAX_ITER: int = 150
 ERROR_CAP = 1e-10
 
 # Skip calculation of root data for A-B plot for performance
-PLOT_ROOTS: bool = False
+PLOT_ROOTS: bool = True
 PLOT_FIRST_EXAMPLE: bool = True
 PLOT_SECOND_EXAMPLE: bool = True
 
@@ -330,7 +329,7 @@ if __name__ == "__main__":
                 if err > 1.0 and DEBUG:
                     print("investigate: phT", p_, h_, T_, f"\terr: {err}")
             else:
-                err = 0.0  # np.nan
+                err = np.nan  # np.nan
 
             err_T_isotherms[T_idx].append(err)
 
@@ -338,6 +337,9 @@ if __name__ == "__main__":
             y_pT = float(res_pp_isotherms[gas_frac_HEADER][idx_])
             y_ph = float(res_pp_ph[gas_frac_HEADER][idx])
             err_y_isotherms[T_idx].append(np.abs(y_pT - y_ph))
+
+    err_T_isotherms = [np.array(_) for _ in err_T_isotherms]
+    err_y_isotherms = [np.array(_) for _ in err_y_isotherms]
 
     logger.info("Calculating h-v flash plot data ..\n")
     results_hv = read_results(HV_FLASH_DATA_PATH)
@@ -475,21 +477,23 @@ if __name__ == "__main__":
     results_geo = read_results(GEO_DATA_PATH)
     results_geo_thermo = read_results(GEO_THERMO_DATA_PATH)
 
-    if EXAMPLE_2_flash_type == 'p-h':
+    if EXAMPLE_2_flash_type == "p-h":
         x_header = h_HEADER
         not_x_header = T_HEADER
-    elif EXAMPLE_2_flash_type == 'p-T':
+    elif EXAMPLE_2_flash_type == "p-T":
         x_header = T_HEADER
         not_x_header = h_HEADER
 
     p_points_geo = np.array([float(_) for _ in results_geo[p_HEADER]])
     x_points_geo = np.array([float(_) for _ in results_geo[x_header]])
-    idx_map_geo = create_index_map(p_points_geo,x_points_geo,)
+    idx_map_geo = create_index_map(
+        p_points_geo,
+        x_points_geo,
+    )
     idx_map_geo_thermo = create_index_map(
         np.array([float(_) for _ in results_geo_thermo[p_HEADER]]),
         np.array([float(_) for _ in results_geo_thermo[x_header]]),
     )
-
 
     p_vec_geo = np.unique(np.sort(np.array(p_points_geo)))
     x_vec_geo = np.unique(np.sort(np.array(x_points_geo)))
@@ -499,6 +503,7 @@ if __name__ == "__main__":
 
     split_geo = np.zeros(p_geo.shape)
     cx_result_geo = np.zeros(p_geo.shape)
+    cx_error_geo = np.zeros(p_geo.shape)
     max_iter_reached_geo = np.zeros(p_geo.shape, dtype=bool)
     num_iter_geo = np.zeros(p_geo.shape)
     doubt_geo = np.zeros(p_geo.shape, dtype=bool)
@@ -518,6 +523,7 @@ if __name__ == "__main__":
             if success_geo in [0, 1, 3]:
                 y_pp = float(results_geo[gas_frac_HEADER][idx])
                 y_th = float(results_geo_thermo[gas_frac_HEADER][idx_thermo])
+                T_th = float(results_geo_thermo[T_HEADER][idx_thermo])
                 # if phase split is not available, use gas fraction
 
                 # if y_th <= 0.0:
@@ -536,9 +542,9 @@ if __name__ == "__main__":
                         split_geo[i, j] = 2
                     elif split == "G":
                         split_geo[i, j] = 3
-                    elif 'LL' in split and 'G' not in split:
+                    elif "LL" in split and "G" not in split:
                         split_geo[i, j] = 4
-                    elif 'GLL' in split:
+                    elif "GLL" in split:
                         split_geo[i, j] = 5
                 else:
                     if y_pp <= 0.0:
@@ -556,6 +562,7 @@ if __name__ == "__main__":
                 y_error_geo[i, j] = np.abs(y_pp - y_th)
 
                 cx_result_geo[i, j] = float(results_geo[not_x_header][idx])
+                cx_error_geo[i, j] = np.abs(cx_result_geo[i, j] - T_th)
 
                 num_iter_geo[i, j] = int(results_geo[num_iter_HEADER][idx])
             else:
@@ -651,7 +658,7 @@ if __name__ == "__main__":
 
         cax = axis.inset_axes([1.02, 0.4, 0.05, 0.2])
         cb_rr = fig.colorbar(img, ax=axis, cax=cax, orientation="vertical")
-        cb_rr.set_ticks([3/4, 3/2 + 3/4])
+        cb_rr.set_ticks([3 / 4, 3 / 2 + 3 / 4])
         cb_rr.set_ticklabels(["1\nroot", "3\nroots"])
 
         axis = fig.add_subplot(1, 2, 2)
@@ -684,13 +691,13 @@ if __name__ == "__main__":
             0.1,
             0.08,
             "supercritical\nliquid extension\nEquation (4.9)",
-            fontsize=rcParams["axes.titlesize"]
+            fontsize=rcParams["axes.titlesize"],
         )
         axis.text(
             0.64,
             0.105,
             "supercritical\ngas extension\nEquation (4.8)",
-            fontsize=rcParams["axes.titlesize"]
+            fontsize=rcParams["axes.titlesize"],
         )
         axis.text(
             0.45,
@@ -698,8 +705,12 @@ if __name__ == "__main__":
             "subcritical\nextensions\nEquation (4.5)",
             fontsize=rcParams["axes.titlesize"],
         )
-        axis.arrow(0.42, 0.04, -0.07, 0.015, linewidth=0.5, head_width=0.005, color='black')
-        axis.arrow(0.42, 0.04, -0.05, -0.02, linewidth=0.5, head_width=0.005, color='black')
+        axis.arrow(
+            0.42, 0.04, -0.07, 0.015, linewidth=0.5, head_width=0.005, color="black"
+        )
+        axis.arrow(
+            0.42, 0.04, -0.05, -0.02, linewidth=0.5, head_width=0.005, color="black"
+        )
 
         fig.tight_layout(pad=FIG_PAD)
         fig.savefig(
@@ -777,7 +788,6 @@ if __name__ == "__main__":
         img = plot_abs_error_pT(axis, p, T, num_iter, norm=None)
         crit = plot_crit_point_H2O(axis)
         img_, leg_ = plot_max_iter_reached(axis, p, T, max_iter_reached)
-        print(f"Number of max iter reached (1st example):\n{max_iter_reached.sum()} / {num_p * num_T}")
         axis.legend(
             crit[0] + img_, crit[1] + leg_, loc="upper left", markerscale=MARKER_SCALE
         )
@@ -802,6 +812,11 @@ if __name__ == "__main__":
         )
         fig_num += 1
         # endregion
+
+        print(f"\nExample 1: averate num iter {np.mean(num_iter)}")
+        print(
+            f"Example 1: num of max iter reached: {max_iter_reached.sum()} / {num_p * num_T}"
+        )
 
         # region Plotting condition numbers
         logger.info(f"{del_log}Plotting condition numbers ..")
@@ -1009,11 +1024,13 @@ if __name__ == "__main__":
 
         # region Plotting L2 error across isotherms
         err_T_l2 = [
-            np.sqrt(np.sum(np.array(vec) ** 2)) / len(vec) for vec in err_T_isotherms
+            np.sqrt(np.sum(vec[np.logical_not(np.isnan(vec))] ** 2)) / len(vec)
+            for vec in err_T_isotherms
         ]
         err_T_l2 = np.array(err_T_l2)
         err_y_l2 = [
-            np.sqrt(np.sum(np.array(vec) ** 2)) / len(vec) for vec in err_y_isotherms
+            np.sqrt(np.sum(vec[np.logical_not(np.isnan(vec))] ** 2)) / len(vec)
+            for vec in err_y_isotherms
         ]
         err_y_l2 = np.array(err_y_l2)
 
@@ -1022,7 +1039,7 @@ if __name__ == "__main__":
         err_y_l2[err_y_l2 < ERROR_CAP] = ERROR_CAP
 
         logger.info(f"{del_log}Plotting L2 errors for isenthalpic flash ..")
-        fig = plt.figure(figsize=(FIGURE_WIDTH, ASPECT_RATIO * 0.6 * FIGURE_WIDTH))
+        fig = plt.figure(figsize=(FIGURE_WIDTH, ASPECT_RATIO * 0.5 * FIGURE_WIDTH))
         axis = fig.add_subplot(1, 1, 1)
         axis.set_box_aspect(0.5)
         axis.set_xlabel("T [K]")
@@ -1050,6 +1067,15 @@ if __name__ == "__main__":
         )
         fig_num += 1
         # endregion
+
+        err_ = np.array(err_T_isotherms)
+        print(
+            f"\nExample 1: p-h flash max error in T: {(err_[np.logical_not(np.isnan(err_))]).max()}"
+        )
+        err_ = np.array(err_y_isotherms)
+        print(
+            f"Example 1: p-h flash max error in y: {(err_[np.logical_not(np.isnan(err_))]).max()}"
+        )
 
         # region Plotting absolute error per isotherm
         logger.info(f"{del_log}Plotting abs error per isotherm ..")
@@ -1096,13 +1122,13 @@ if __name__ == "__main__":
                 axis.set_title(f"T = {T_vec_isotherms[n]} [K]")
 
                 # caping errors from below for plot
-                err_T_abs = np.array(err_T_isotherms[n])
-                err_y_abs = np.array(err_y_isotherms[n])
+                err_T_abs = err_T_isotherms[n]
+                err_y_abs = err_y_isotherms[n]
                 err_T_abs[err_T_abs < ERROR_CAP] = ERROR_CAP
                 err_y_abs[err_y_abs < ERROR_CAP] = ERROR_CAP
-                img_T = axis.plot(p_, err_T_abs, "-s", color="red", markersize=marker_size)[
-                    0
-                ]
+                img_T = axis.plot(
+                    p_, err_T_abs, "-s", color="red", markersize=marker_size
+                )[0]
                 img_y = axis.plot(
                     p_, err_y_abs, "-D", color="black", markersize=marker_size
                 )[0]
@@ -1146,7 +1172,12 @@ if __name__ == "__main__":
         axis.set_xlabel(f"p [{PRESSURE_SCALE_NAME}]")
         axis.set_yscale("log")
         img_ip, leg_ip = plot_hv_iso(
-            axis, p_iT * PRESSURE_SCALE, err_hv_p_iT, err_hv_T_iT, err_hv_s_iT, err_hv_y_iT
+            axis,
+            p_iT * PRESSURE_SCALE,
+            err_hv_p_iT,
+            err_hv_T_iT,
+            err_hv_s_iT,
+            err_hv_y_iT,
         )
 
         fig.tight_layout(pad=FIG_PAD, h_pad=0.5)
@@ -1224,111 +1255,49 @@ if __name__ == "__main__":
         # endregion
     else:
         fig_num += 10
-    
+
     if PLOT_SECOND_EXAMPLE:
-        # region Geothermal example plot
-        logger.info(f"{del_log}Plotting for second example ..")
-        fig = plt.figure(figsize=(FIGURE_WIDTH, ASPECT_RATIO * 3 * FIGURE_WIDTH))
-        axis = fig.add_subplot(3, 1, 1)
-        axis.set_box_aspect(1)
-        axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        axis.set(xticklabels=[])
-        axis.set(xlabel=None)
-        axis.tick_params(bottom=False)
-        smax = split_geo.max()
-        if smax > 3.5:
-            img = plot_phase_split_GnL(axis, p_geo, x_geo * X_SCALE, split_geo)
-        else:
-            img = plot_phase_split_GL(axis, p_geo, x_geo * X_SCALE, split_geo)
-        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
-        cb = fig.colorbar(
-            img,
-            ax=axis,
-            cax=cax,
-            orientation="vertical",
-        )
-        if smax > 3.5:
-            cb.set_ticks([5 / 6 * k - 5 / 12 for k in range(1, 7)])
-            cb.set_ticklabels(["N/A", "L", "GL", "G", "L+", "GL+"])
-        else:
-            cb.set_ticks([3 / 4 * k - 3 / 8 for k in range(1, 5)])
-            cb.set_ticklabels(["N/A", "L", "GL", "G"])
 
-
-        axis = fig.add_subplot(3, 1, 2)
-        axis.set_box_aspect(1)
-        axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        axis.set(xticklabels=[])
-        axis.set(xlabel=None)
-        axis.tick_params(bottom=False)
-        img = plot_abs_error_pT(
-            # axis, p_geo, x_geo * ENTHALPY_SCALE, num_iter_geo, norm=None
-            axis, p_geo, x_geo * X_SCALE, y_error_geo, norm=None
-        )
-        img_, leg_ = plot_max_iter_reached(
-            axis, p_geo, x_geo * X_SCALE, max_iter_reached_geo
-        )
-        print(f"Number of max iter reached (2nd example):\n{max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}")
-        axis.legend(
-            img_, leg_, loc="upper left", markerscale=MARKER_SCALE
-        )
-        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
-        cb = fig.colorbar(
-            img,
-            ax=axis,
-            cax=cax,
-            orientation="vertical",  # format=ticker.FuncFormatter(_fmt),
-        )
-        # cbt = np.linspace(0, num_iter_geo.max(), 5, endpoint=True)
-        # cb.set_ticks(cbt.astype(int))
-
-        axis = fig.add_subplot(3, 1, 3)
-        axis.set_box_aspect(1)
-        if EXAMPLE_2_flash_type == 'p-h':
-            axis.set_xlabel(f"h [{X_SCALE_NAME}]")
-        else:
-            axis.set_xlabel("T [K]")
-        axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        img = plot_conjugate_x_for_px_flash(axis, p_geo, x_geo, cx_result_geo)
-        cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
-        cb = fig.colorbar(
-            img,
-            ax=axis,
-            cax=cax,
-            orientation="vertical",
-        )
-        cx_max = cx_result_geo.max()
-        cx_min = cx_result_geo.min()
-        smallest, nextsmallest, *_ = np.partition(cx_result_geo[cx_result_geo >= 0].flatten(), 1)
-        cbt = np.linspace(nextsmallest, cx_max, 5, endpoint=True)
-        cbt = np.unique(np.sort(np.hstack([cbt, np.array([cx_min])])))
-        cb.set_ticks(cbt.astype(int))
-
-        # fig.tight_layout(pad=FIG_PAD)
-        fig.tight_layout()
-        fig.savefig(
-            f"{fig_path}figure_{fig_num}.{FIGURE_FORMAT}",
-            format=FIGURE_FORMAT,
-            dpi=DPI,
-        )
-        fig_num += 1
-        # endregion
+        # axis = fig.add_subplot(3, 1, 1)
+        # axis.set_box_aspect(1)
+        # axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
+        # axis.set(xticklabels=[])
+        # axis.set(xlabel=None)
+        # axis.tick_params(bottom=False)
+        # smax = split_geo.max()
+        # if smax > 3.5:
+        #     img = plot_phase_split_GnL(axis, p_geo, x_geo * X_SCALE, split_geo)
+        # else:
+        #     img = plot_phase_split_GL(axis, p_geo, x_geo * X_SCALE, split_geo)
+        # cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
+        # cb = fig.colorbar(
+        #     img,
+        #     ax=axis,
+        #     cax=cax,
+        #     orientation="vertical",
+        # )
+        # if smax > 3.5:
+        #     cb.set_ticks([5 / 6 * k - 5 / 12 for k in range(1, 7)])
+        #     cb.set_ticklabels(["N/A", "L", "GL", "G", "L+", "GL+"])
+        # else:
+        #     cb.set_ticks([3 / 4 * k - 3 / 8 for k in range(1, 5)])
+        #     cb.set_ticklabels(["N/A", "L", "GL", "G"])
 
         # region errors in y and T
-        fig = plt.figure(figsize=(2 * FIGURE_WIDTH, ASPECT_RATIO * FIGURE_WIDTH))
-        axis = fig.add_subplot(1, 2, 1)
+        fig = plt.figure(figsize=(FIGURE_WIDTH, 2 * ASPECT_RATIO * FIGURE_WIDTH))
+        axis = fig.add_subplot(2, 1, 1)
         axis.set_box_aspect(1)
         axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        if EXAMPLE_2_flash_type == 'p-h':
-            axis.set_xlabel(f"h [{X_SCALE_NAME}]")
-        else:
-            axis.set_xlabel("T [K]")
+        # if EXAMPLE_2_flash_type == 'p-h':
+        #     axis.set_xlabel(f"h [{X_SCALE_NAME}]")
+        # else:
+        #     axis.set_xlabel("T [K]")
+        axis.set(xticklabels=[])
+        axis.set(xlabel=None)
+        axis.tick_params(bottom=False)
 
-        y_error_geo[y_error_geo == y_error_geo.max()] = 0.
-        img = plot_abs_error_pT(
-            # axis, p_geo, x_geo * ENTHALPY_SCALE, num_iter_geo, norm=None
-            axis, p_geo, x_geo * X_SCALE, y_error_geo, norm=None
-        )
+        y_error_geo[doubt_geo] = 0.0
+        img = plot_abs_error_pT(axis, p_geo, x_geo * X_SCALE, y_error_geo, norm=None)
         cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
         cb = fig.colorbar(
             img,
@@ -1354,17 +1323,42 @@ if __name__ == "__main__":
         )
         img_v = [hatch]
         leg_v = [f"gas phase"]
-        axis.legend(img_v, leg_v, loc="upper left", markerscale=MARKER_SCALE)
 
+        if np.any(doubt_geo):
+            img_d = axis.plot(
+                x_geo[doubt_geo] * X_SCALE,
+                p_geo[doubt_geo] * PRESSURE_SCALE,
+                "X",
+                markersize=MARKER_SIZE,
+                color="red",
+            )
+            leg_d = ["failure"]
+        else:
+            img_d = []
+            leg_d = []
 
-        axis = fig.add_subplot(1, 2, 2)
+        axis.legend(
+            img_v + img_d, leg_v + leg_d, loc="upper left", markerscale=MARKER_SCALE
+        )
+
+        # remove faulty entries to not mess with the scaling of the plot
+        # mark faulty entries with separate markers
+        t_mean = np.mean(cx_result_geo[np.logical_not(doubt_geo)])
+        cx_result_geo[doubt_geo] = t_mean
+        cx_error_geo[doubt_geo] = 0.0
+
+        axis = fig.add_subplot(2, 1, 2)
         axis.set_box_aspect(1)
         axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        if EXAMPLE_2_flash_type == 'p-h':
+        if EXAMPLE_2_flash_type == "p-h":
             axis.set_xlabel(f"h [{X_SCALE_NAME}]")
         else:
             axis.set_xlabel("T [K]")
         img = plot_conjugate_x_for_px_flash(axis, p_geo, x_geo, cx_result_geo)
+        # img = plot_abs_error_pT(
+        #     # axis, p_geo, x_geo * ENTHALPY_SCALE, num_iter_geo, norm=None
+        #     axis, p_geo, x_geo * X_SCALE, cx_error_geo, norm=None
+        # )
         cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
         cb = fig.colorbar(
             img,
@@ -1374,13 +1368,25 @@ if __name__ == "__main__":
         )
         cx_max = cx_result_geo.max()
         cx_min = cx_result_geo.min()
-        smallest, nextsmallest, *_ = np.partition(cx_result_geo[cx_result_geo >= 0].flatten(), 1)
+        smallest, nextsmallest, *_ = np.partition(
+            cx_result_geo[cx_result_geo >= 0].flatten(), 1
+        )
         cbt = np.linspace(nextsmallest, cx_max, 5, endpoint=True)
         cbt = np.unique(np.sort(np.hstack([cbt, np.array([cx_min])])))
         cb.set_ticks(cbt.astype(int))
 
+        if np.any(doubt_geo):
+            img_d = axis.plot(
+                x_geo[doubt_geo] * X_SCALE,
+                p_geo[doubt_geo] * PRESSURE_SCALE,
+                "X",
+                markersize=MARKER_SIZE,
+                color="red",
+            )
+
         # fig.tight_layout(pad=FIG_PAD)
-        fig.tight_layout()
+        fig.tight_layout(pad=10 * FIG_PAD, w_pad=0.1)
+        # fig.tight_layout()
         fig.savefig(
             f"{fig_path}figure_{fig_num}.{FIGURE_FORMAT}",
             format=FIGURE_FORMAT,
@@ -1395,19 +1401,18 @@ if __name__ == "__main__":
         axis = fig.add_subplot(1, 1, 1)
         axis.set_box_aspect(1)
         axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        if EXAMPLE_2_flash_type == 'p-h':
+        if EXAMPLE_2_flash_type == "p-h":
             axis.set_xlabel(f"h [{X_SCALE_NAME}]")
         else:
             axis.set_xlabel("T [K]")
 
-        img = plot_abs_error_pT(
-            axis, p_geo, x_geo * X_SCALE, num_iter_geo, norm=None
+        # norm = mpl.colors.LogNorm(vmin=ERROR_CAP, vmax=num_iter_geo.max(), clip=True)
+        img = plot_abs_error_pT(axis, p_geo, x_geo * X_SCALE, num_iter_geo, norm=None)
+        img_, leg_ = plot_max_iter_reached(
+            axis, p_geo, x_geo * X_SCALE, max_iter_reached_geo
         )
-        img_, leg_ = plot_max_iter_reached(axis, p_geo, x_geo * X_SCALE, max_iter_reached_geo)
-        print(f"Number of max iter reached (1st example):\n{max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}")
-        axis.legend(
-            img_, leg_, loc="upper left", markerscale=MARKER_SCALE
-        )
+
+        axis.legend(img_, leg_, loc="upper left", markerscale=MARKER_SCALE)
 
         cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
         cb = fig.colorbar(
@@ -1429,5 +1434,11 @@ if __name__ == "__main__":
         )
         fig_num += 1
         # endregion
+
+        # printing average number of iterations
+        print(f"Example 2: average num iter: {np.mean(num_iter_geo)}")
+        print(
+            f"Example 2: num of max iter reached: {max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}"
+        )
     else:
-        fig_num += 1
+        fig_num += 2
