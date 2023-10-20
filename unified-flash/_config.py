@@ -85,7 +85,7 @@ HV_ISOTHERM_P_LIMITS: list[float] = [5e6, 15e6]
 RESOLUTION_hv: int = 10
 
 # Pressure and enthalpy limits for multi-component, geothermal fluid example
-GEO_P_LIMITS: list[float] = [20e6, 27e6]  # [Pa]
+GEO_P_LIMITS: list[float] = [22e6, 27e6]  # [Pa]
 # GEO_H_LIMITS: list[float] = [-15e3, 15e3]  # [kJ]
 GEO_H_LIMITS: list[float] = [-15e3, 8e3]  # [kJ]
 GEO_T_LIMITS: list[float] = [500, 820]
@@ -550,6 +550,14 @@ def calculate_thermo_pT_data() -> dict[str, list]:
     return results
 
 
+def _test_range_geo(p, x):
+
+    p = p[p <= 22e6]
+    x = x[np.logical_and(0 <= x, x <= 5e3)]
+
+    return p, x
+
+
 def calculate_geo_example_thermo(flash_type: str = "p-h") -> dict[str, list]:
     """Uses thermo to perform the p-T flash for various pressure and temperature ranges.
 
@@ -590,6 +598,9 @@ def calculate_geo_example_thermo(flash_type: str = "p-h") -> dict[str, list]:
     else:
         raise ValueError("Only p-T or p-h flash supported for this example.")
 
+    # p_points, x_points = _test_range_geo(np.array(p_points), np.array(x_points))
+    # p_points = p_points.tolist()
+    # x_points = x_points.tolist()
     f_num = len(x_points) * len(p_points)
     f_count = 1
 
@@ -1244,6 +1255,15 @@ def _parallel_porepy_flash_geo(args):
         state_input = {"p": np.array([state_1]), "T": np.array([state_2])}
     elif flash_type == "p-h":
         state_input = {"p": np.array([state_1]), "h": np.array([state_2])}
+
+        # if state_1 <= 22e6 and 0 <= state_2 <= 5e3:
+            # flash.armijo_parameters["j_max"] = 50
+            # flash.initialization_parameters = {
+            #     'N1': 3,
+            #     'N2': 3,
+            #     'N3': 15,
+            # }
+
     elif flash_type == "h-v":
         state_input = {"h": np.array([state_1]), "v": np.array([state_2])}
 
@@ -1548,6 +1568,7 @@ def calculate_geo_example(flash_type: str = "p-h", use_thermo_for_init: bool = F
     else:
         raise ValueError("Only p-T or p-h flash supported for this example.")
 
+    # p_, x_ = _test_range_geo(p_, x_)
     x, p = np.meshgrid(x_, p_)
 
     nf = p.shape[0] * p.shape[1]

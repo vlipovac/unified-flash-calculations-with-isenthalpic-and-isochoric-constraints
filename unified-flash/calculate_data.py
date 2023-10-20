@@ -54,10 +54,10 @@ from _config import (
 )
 
 # Flags for which data should be computed, to avoid long waiting for re-computations
-COMPUTE_THERMO_DATA = False
-COMPUTE_PT_DATA = False
-COMPUTE_PH_DATA = False
-COMPUTE_HV_DATA = False
+COMPUTE_THERMO_DATA = True
+COMPUTE_PT_DATA = True
+COMPUTE_PH_DATA = True
+COMPUTE_HV_DATA = True
 COMPUTE_GEO_THERMO_DATA = True
 COMPUTE_GEO_DATA = True
 

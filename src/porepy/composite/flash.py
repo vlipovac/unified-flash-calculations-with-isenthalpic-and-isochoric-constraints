@@ -1645,7 +1645,6 @@ class FlashNR:
         res_is_zero = False
         h_norm = state.h.copy()
         h_norm[np.abs(h_norm) <= 1] = 1.0
-        L = 100
 
         for _ in range(num_iter):
             phase_props = self.mixture.compute_properties(
@@ -1654,7 +1653,7 @@ class FlashNR:
             h_mix = safe_sum([y * prop.h for y, prop in zip(state.y, phase_props)])
 
             # H = state.T ** (-2) * (h_mix - state.h) / h_norm
-            H = (h_mix - state.h) / h_norm  # + L * (state.T - state.T.val)
+            H = (h_mix - state.h) / h_norm
             if np.linalg.norm(H.val) <= self.tolerance:
                 res_is_zero = True
                 break
@@ -1964,7 +1963,7 @@ class FlashNR:
 
         # if maximal line-search interval defined, use for-loop
         if j_max:
-            for j in range(1, j_max + 1):
+            for j in range(1, j_max + 1):  # TODO test with starting from 0
                 # new step-size
                 rho_j = rho**j
 

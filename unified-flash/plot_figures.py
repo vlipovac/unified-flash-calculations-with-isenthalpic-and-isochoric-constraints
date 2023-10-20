@@ -92,9 +92,9 @@ MAX_ITER: int = 150
 ERROR_CAP = 1e-10
 
 # Skip calculation of root data for A-B plot for performance
-PLOT_ROOTS: bool = False
+PLOT_ROOTS: bool = True
 # Plots for water-CO2 mixture
-PLOT_FIRST_EXAMPLE: bool = False
+PLOT_FIRST_EXAMPLE: bool = True
 # plots for multicomponent mixture
 PLOT_SECOND_EXAMPLE: bool = True
 
@@ -559,7 +559,7 @@ if __name__ == "__main__":
 
                 if success_geo == 1:
                     max_iter_reached_geo[i, j] = True
-                    doubt_geo[i, j] = True
+                    # doubt_geo[i, j] = True
 
                 y_error_geo[i, j] = np.abs(y_pp - y_th)
 
@@ -1285,7 +1285,7 @@ if __name__ == "__main__":
         #     cb.set_ticks([3 / 4 * k - 3 / 8 for k in range(1, 5)])
         #     cb.set_ticklabels(["N/A", "L", "GL", "G"])
 
-        # printing average number of iterations
+        # printing average number of iterations and failures
         print(f"\nExample 2: average num iter: {np.mean(num_iter_geo)}")
         print(
             f"Example 2: num of max iter reached: {max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}"
@@ -1367,10 +1367,7 @@ if __name__ == "__main__":
         else:
             axis.set_xlabel("T [K]")
         img = plot_conjugate_x_for_px_flash(axis, p_geo, x_geo, cx_result_geo)
-        # img = plot_abs_error_pT(
-        #     # axis, p_geo, x_geo * ENTHALPY_SCALE, num_iter_geo, norm=None
-        #     axis, p_geo, x_geo * X_SCALE, cx_error_geo, norm=None
-        # )
+        # img = plot_abs_error_pT(axis, p_geo, x_geo * X_SCALE, cx_error_geo, norm=None)
         cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
         cb = fig.colorbar(
             img,
@@ -1383,8 +1380,8 @@ if __name__ == "__main__":
         smallest, nextsmallest, *_ = np.partition(
             cx_result_geo[cx_result_geo >= 0].flatten(), 1
         )
-        cbt = np.linspace(nextsmallest, cx_max, 5, endpoint=True)
-        cbt = np.unique(np.sort(np.hstack([cbt, np.array([cx_min])])))
+        cbt = np.linspace(cx_min, cx_max, 5, endpoint=True)
+        # cbt = np.unique(np.sort(np.hstack([cbt, np.array([cx_min])])))
         cb.set_ticks(cbt.astype(int))
 
         if np.any(doubt_geo):

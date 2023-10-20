@@ -13,13 +13,8 @@ FEED_geo: list[float] = [0.8, 0.05, 0.1, 0.05]
 
 vec = np.ones(1)
 
-p = 22153846.153846152
-p = 22692307.692307692
-p = 22871794.871794872
-T = 300
-h = -1435.8974358974356
-h = -1435.8974358974356
-h = 1512.8205128205118
+p = 26282051.28205128
+h = 2102.5641025641016
 
 
 def _thermo_init(species=SPECIES) -> FlashVLN:
@@ -91,12 +86,12 @@ mix.set_up()
 flash = pp.composite.FlashNR(mix)
 flash.use_armijo = True
 flash.armijo_parameters["rho"] = 0.99
-flash.armijo_parameters["j_max"] = 30
+flash.armijo_parameters["j_max"] = 70
 flash.armijo_parameters["return_max"] = True
 flash.initialization_parameters = {
     'N1': 3,
     'N2': 1,
-    'N3': 5,
+    'N3': 21,
 }
 flash.newton_update_chop = 1.0
 flash.tolerance = 1e-8
