@@ -92,9 +92,9 @@ MAX_ITER: int = 150
 ERROR_CAP = 1e-10
 
 # Skip calculation of root data for A-B plot for performance
-PLOT_ROOTS: bool = True
+PLOT_ROOTS: bool = False
 # Plots for water-CO2 mixture
-PLOT_FIRST_EXAMPLE: bool = True
+PLOT_FIRST_EXAMPLE: bool = False
 # plots for multicomponent mixture
 PLOT_SECOND_EXAMPLE: bool = True
 
@@ -1285,6 +1285,16 @@ if __name__ == "__main__":
         #     cb.set_ticks([3 / 4 * k - 3 / 8 for k in range(1, 5)])
         #     cb.set_ticklabels(["N/A", "L", "GL", "G"])
 
+        # printing average number of iterations
+        print(f"\nExample 2: average num iter: {np.mean(num_iter_geo)}")
+        print(
+            f"Example 2: num of max iter reached: {max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}"
+        )
+        print(
+            f"Example 2: num of failures: {doubt_geo.sum()} / {num_p_geo * num_x_geo}"
+        )
+        doubt_geo = np.logical_or(doubt_geo, max_iter_reached_geo)
+
         # region errors in y and T
         fig = plt.figure(figsize=(FIGURE_WIDTH, 2 * ASPECT_RATIO * FIGURE_WIDTH))
         axis = fig.add_subplot(2, 1, 1)
@@ -1424,7 +1434,10 @@ if __name__ == "__main__":
             orientation="vertical",  # format=ticker.FuncFormatter(_fmt),
         )
         cbt = cb.get_ticks()
+        cbt = cbt[cbt < num_iter_geo.max()]
         cbt = np.sort(np.hstack([cbt, np.array([num_iter_geo.max()])]))
+        if np.abs(cbt[-1] - cbt[-2]) <= 4:
+            cbt = np.hstack([cbt[:-2], cbt[-1:]])
         cbt = cbt[cbt <= num_iter_geo.max()]
         cb.set_ticks(cbt.astype(int))
 
@@ -1436,11 +1449,5 @@ if __name__ == "__main__":
         )
         fig_num += 1
         # endregion
-
-        # printing average number of iterations
-        print(f"Example 2: average num iter: {np.mean(num_iter_geo)}")
-        print(
-            f"Example 2: num of max iter reached: {max_iter_reached_geo.sum()} / {num_p_geo * num_x_geo}"
-        )
     else:
         fig_num += 2

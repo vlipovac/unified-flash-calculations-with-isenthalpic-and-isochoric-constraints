@@ -917,13 +917,28 @@ def create_mixture(
     flash.newton_update_chop = 1.0
     flash.tolerance = 1e-8
     flash.max_iter = 150
+    flash.initialization_parameters = {
+        'N1': 3,
+        'N2': 3,
+        'N3': 1,
+    }
 
     if flash_type == "h-v":
         flash.armijo_parameters["rho"] = 0.9
         flash.armijo_parameters["j_max"] = 150
+        flash.initialization_parameters = {
+            'N1': 2,
+            'N2': 2,
+            'N3': 7,
+        }
     elif flash_type == "p-h":
-        flash.armijo_parameters["j_max"] = 70
+        flash.armijo_parameters["j_max"] = 30
         flash.npipm_parameters["w"] = 1.0
+        flash.initialization_parameters = {
+            'N1': 3,
+            'N2': 1,
+            'N3': 5,
+        }
 
     return mix, flash
 
@@ -959,9 +974,14 @@ def create_mixture_geo(
     flash = pp.composite.FlashNR(mix)
     flash.use_armijo = True
     flash.armijo_parameters["rho"] = 0.99
-    flash.armijo_parameters["j_max"] = 70
+    flash.armijo_parameters["j_max"] = 30
     flash.armijo_parameters["return_max"] = True
     flash.npipm_parameters["w"] = 1.0
+    flash.initialization_parameters = {
+        'N1': 3,
+        'N2': 1,
+        'N3': 5,
+    }
     flash.newton_update_chop = 1.0
     flash.tolerance = 1e-8
     flash.max_iter = 150
@@ -1235,6 +1255,7 @@ def _parallel_porepy_flash_geo(args):
     else:
         flash._T_guess = None
 
+    restart = False
     try:
         success_, state = flash.flash(
             state=state_input,
@@ -1244,7 +1265,31 @@ def _parallel_porepy_flash_geo(args):
         )
     except Exception as err:  # if Flasher fails, flag as failed
         logger.warn(f"\nParallel {flash_type} flash crashed at {msg}\n{str(err)}\n")
+        restart = True
     else:
+        if success_ not in [0, 3]:
+            restart = True
+
+    if restart:
+        flash.armijo_parameters["j_max"] = 70
+        flash.initialization_parameters = {
+            'N1': 3,
+            'N2': 3,
+            'N3': 15,
+        }
+        logger.warn(f"\nRestarting parallel {flash_type} flash at {msg}\n")
+        try:
+            success_, state = flash.flash(
+                state=state_input,
+                feed=feed,
+                eos_kwargs={"apply_smoother": True},
+                return_system=True,
+            )
+        except Exception as err:  # if Flasher fails, flag as failed
+            logger.warn(f"\nRestarted Parallel {flash_type} flash crashed at {msg}\n{str(err)}\n")
+            success_ = 4
+
+    if success_ in [0, 1, 2, 3]:
         success_arr[i] = success_
         if success_ == 2:
             logger.warn(f"\nParallel {flash_type} diverged at {msg}\n")

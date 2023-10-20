@@ -862,6 +862,25 @@ class FlashNR:
 
         """
 
+        self.initialization_parameters: dict[str, int] = {}
+        """Numbers of iterations for the initialization.
+        
+        - ``'N1'``: number successive substitutions for fractions guess
+        - ``'N2'``: number of iterations when solving state constraints
+        - ``'N3'``: number of alternation between fraction guess and state constraints
+
+        If not given, the following default parameters are used:
+
+        - p-T flash: ``'N1': 3``
+        - p-h flash: ``'N1': 3`` ``'N2': 3`` ``'N3': 15``
+        - h-v flash: ``'N1': 2`` ``'N2': 2`` ``'N3': 7``
+
+        Important:
+            The values are critical for the robustness of the initial guess and the
+            flash as a total.
+
+        """
+
     @overload
     def flash(
         self,
@@ -1060,8 +1079,9 @@ class FlashNR:
 
             if guess_from_state is None:
                 thd_state.z = feed
+                N1 = self.initialization_parameters.get('N1', 3)
                 thd_state = self._guess_fractions(
-                    thd_state, num_vals, num_iter=3, guess_K_values=True
+                    thd_state, num_vals, num_iter=N1, guess_K_values=True
                 )
 
         elif flash_type == "p-h":
@@ -1081,6 +1101,10 @@ class FlashNR:
             if guess_from_state is None:
                 thd_state.z = feed
 
+                N1 = self.initialization_parameters.get('N1', 3)
+                N2 = self.initialization_parameters.get('N2', 3)
+                N3 = self.initialization_parameters.get('N3', 15)
+
                 if self._T_guess is not None:
                     thd_state.T.val = np.ones(num_vals) * self._T_guess
                     thd_state = self._guess_fractions(
@@ -1090,16 +1114,16 @@ class FlashNR:
                     # initial temperature guess using pseudo-critical temperature
                     thd_state = self._pseudo_crit_T(thd_state)
                     thd_state = self._guess_fractions(
-                        thd_state, num_vals, num_iter=3, guess_K_values=True
+                        thd_state, num_vals, num_iter=N1, guess_K_values=True
                     )
                     # Alternating guess for fractions and temperature
                     # successive-substitution-like
-                    for _ in range(15):
+                    for _ in range(N3):
                         # iterate over the enthalpy constraint some times to update T
-                        thd_state, _ = self._guess_temperature(thd_state, num_vals, 3)
+                        thd_state, _ = self._guess_temperature(thd_state, num_vals, N2)
                         # Update fractions using the updated T
                         thd_state = self._guess_fractions(
-                            thd_state, num_vals, num_iter=3, guess_K_values=False
+                            thd_state, num_vals, num_iter=N1, guess_K_values=False
                         )
 
         elif flash_type == "h-v":
@@ -1119,6 +1143,9 @@ class FlashNR:
             if guess_from_state is None:
                 thd_state.z = feed
 
+                N1 = self.initialization_parameters.get('N1', 2)
+                N2 = self.initialization_parameters.get('N2', 2)
+                N3 = self.initialization_parameters.get('N3', 7)
                 # initial p-T guess using pseudo-critical values
                 thd_state = self._pseudo_crit_T(thd_state)
                 thd_state = self._pseudo_crit_p(
@@ -1126,19 +1153,19 @@ class FlashNR:
                 )
                 # update fractions with new guess
                 thd_state = self._guess_fractions(
-                    thd_state, num_vals, num_iter=2, guess_K_values=False
+                    thd_state, num_vals, num_iter=N1, guess_K_values=False
                 )
                 # thd_state = self._guess_pT_for_hv_saha(
                 #     thd_state, num_vals, gas_phase_index
                 # )
-                for _ in range(7):
+                for _ in range(N3):
                     # solve constraints
                     thd_state, res_is_zero = self._guess_pT_for_hv(
-                        thd_state, num_vals, 2
+                        thd_state, num_vals, N2
                     )
                     # Update fractions using the updated T
                     thd_state = self._guess_fractions(
-                        thd_state, num_vals, num_iter=2, guess_K_values=False
+                        thd_state, num_vals, num_iter=N1, guess_K_values=False
                     )
                     if res_is_zero:
                         break
@@ -1618,6 +1645,7 @@ class FlashNR:
         res_is_zero = False
         h_norm = state.h.copy()
         h_norm[np.abs(h_norm) <= 1] = 1.0
+        L = 100
 
         for _ in range(num_iter):
             phase_props = self.mixture.compute_properties(
@@ -1626,7 +1654,7 @@ class FlashNR:
             h_mix = safe_sum([y * prop.h for y, prop in zip(state.y, phase_props)])
 
             # H = state.T ** (-2) * (h_mix - state.h) / h_norm
-            H = (h_mix - state.h) / h_norm
+            H = (h_mix - state.h) / h_norm  # + L * (state.T - state.T.val)
             if np.linalg.norm(H.val) <= self.tolerance:
                 res_is_zero = True
                 break

@@ -54,10 +54,10 @@ from _config import (
 )
 
 # Flags for which data should be computed, to avoid long waiting for re-computations
-COMPUTE_THERMO_DATA = True
-COMPUTE_PT_DATA = True
-COMPUTE_PH_DATA = True
-COMPUTE_HV_DATA = True
+COMPUTE_THERMO_DATA = False
+COMPUTE_PT_DATA = False
+COMPUTE_PH_DATA = False
+COMPUTE_HV_DATA = False
 COMPUTE_GEO_THERMO_DATA = True
 COMPUTE_GEO_DATA = True
 
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     if COMPUTE_GEO_DATA:
         logger.info("Starting PorePy calculations for geothermal fluid ..\n")
         start_time = time.time()
-        results = calculate_geo_example(EXAMPLE_2_flash_type, True)
+        results = calculate_geo_example(EXAMPLE_2_flash_type)
         end_time = time.time()
         logger.info(f"Finished p-h-calculations ({end_time - start_time} seconds).")
         write_results(GEO_DATA_PATH, results)
