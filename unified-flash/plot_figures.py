@@ -1260,31 +1260,6 @@ if __name__ == "__main__":
 
     if PLOT_SECOND_EXAMPLE:
 
-        # axis = fig.add_subplot(3, 1, 1)
-        # axis.set_box_aspect(1)
-        # axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        # axis.set(xticklabels=[])
-        # axis.set(xlabel=None)
-        # axis.tick_params(bottom=False)
-        # smax = split_geo.max()
-        # if smax > 3.5:
-        #     img = plot_phase_split_GnL(axis, p_geo, x_geo * X_SCALE, split_geo)
-        # else:
-        #     img = plot_phase_split_GL(axis, p_geo, x_geo * X_SCALE, split_geo)
-        # cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
-        # cb = fig.colorbar(
-        #     img,
-        #     ax=axis,
-        #     cax=cax,
-        #     orientation="vertical",
-        # )
-        # if smax > 3.5:
-        #     cb.set_ticks([5 / 6 * k - 5 / 12 for k in range(1, 7)])
-        #     cb.set_ticklabels(["N/A", "L", "GL", "G", "L+", "GL+"])
-        # else:
-        #     cb.set_ticks([3 / 4 * k - 3 / 8 for k in range(1, 5)])
-        #     cb.set_ticklabels(["N/A", "L", "GL", "G"])
-
         # printing average number of iterations and failures
         print(f"\nExample 2: average num iter: {np.mean(num_iter_geo)}")
         print(
@@ -1300,10 +1275,6 @@ if __name__ == "__main__":
         axis = fig.add_subplot(2, 1, 1)
         axis.set_box_aspect(1)
         axis.set_ylabel(f"p [{PRESSURE_SCALE_NAME}]")
-        # if EXAMPLE_2_flash_type == 'p-h':
-        #     axis.set_xlabel(f"h [{X_SCALE_NAME}]")
-        # else:
-        #     axis.set_xlabel("T [K]")
         axis.set(xticklabels=[])
         axis.set(xlabel=None)
         axis.tick_params(bottom=False)
@@ -1367,7 +1338,6 @@ if __name__ == "__main__":
         else:
             axis.set_xlabel("T [K]")
         img = plot_conjugate_x_for_px_flash(axis, p_geo, x_geo, cx_result_geo)
-        # img = plot_abs_error_pT(axis, p_geo, x_geo * X_SCALE, cx_error_geo, norm=None)
         cax = axis.inset_axes([1.04, 0.2, 0.05, 0.6])
         cb = fig.colorbar(
             img,
@@ -1381,7 +1351,6 @@ if __name__ == "__main__":
             cx_result_geo[cx_result_geo >= 0].flatten(), 1
         )
         cbt = np.linspace(cx_min, cx_max, 5, endpoint=True)
-        # cbt = np.unique(np.sort(np.hstack([cbt, np.array([cx_min])])))
         cb.set_ticks(cbt.astype(int))
 
         if np.any(doubt_geo):
@@ -1393,9 +1362,7 @@ if __name__ == "__main__":
                 color="red",
             )
 
-        # fig.tight_layout(pad=FIG_PAD)
         fig.tight_layout(pad=10 * FIG_PAD, w_pad=0.1)
-        # fig.tight_layout()
         fig.savefig(
             f"{fig_path}figure_{fig_num}.{FIGURE_FORMAT}",
             format=FIGURE_FORMAT,
@@ -1415,7 +1382,6 @@ if __name__ == "__main__":
         else:
             axis.set_xlabel("T [K]")
 
-        # norm = mpl.colors.LogNorm(vmin=ERROR_CAP, vmax=num_iter_geo.max(), clip=True)
         img = plot_abs_error_pT(axis, p_geo, x_geo * X_SCALE, num_iter_geo, norm=None)
         img_, leg_ = plot_max_iter_reached(
             axis, p_geo, x_geo * X_SCALE, max_iter_reached_geo
@@ -1428,7 +1394,7 @@ if __name__ == "__main__":
             img,
             ax=axis,
             cax=cax,
-            orientation="vertical",  # format=ticker.FuncFormatter(_fmt),
+            orientation="vertical",
         )
         cbt = cb.get_ticks()
         cbt = cbt[cbt < num_iter_geo.max()]
